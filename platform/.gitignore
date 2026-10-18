@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# environment – never commit real secrets
+.env
+.env.local
+.env.*.local
+.env.test
+.env.e2e
+
+# local uploads (development storage driver)
+storage/
+
+# test output
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# misc
+.DS_Store
+*.log
