@@ -34,6 +34,7 @@ const privatePaths = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  devIndicators: false,
   reactStrictMode: true,
   serverExternalPackages: ["pg", "sharp"],
   experimental: {

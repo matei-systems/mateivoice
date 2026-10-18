@@ -1,0 +1,248 @@
+@import "tailwindcss";
+
+/*
+ * Designsystem „Aurora“
+ * ---------------------------------------------------------------------------
+ * Alle Farben, Radien, Schatten und Animationen sind hier als Tokens definiert.
+ * Komponenten verwenden ausschließlich diese Tokens (z. B. bg-brand-600,
+ * text-ink-700, shadow-card) – keine verstreuten Hex-Werte.
+ *
+ * Kontrast (WCAG 2.2 AA): brand-600 auf Weiß ≈ 5,0:1, ink-600 auf Weiß ≈ 6,1:1.
+ */
+
+@theme {
+  /* Schrift */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+
+  /* Markenfarbe Pink – 600 ist die zugängliche Aktionsfarbe */
+  --color-brand-25: #fffafc;
+  --color-brand-50: #fff4f8;
+  --color-brand-100: #ffe8f0;
+  --color-brand-200: #ffd2e1;
+  --color-brand-300: #fcb0c9;
+  --color-brand-400: #f584aa;
+  --color-brand-500: #ea5a8d;
+  --color-brand-600: #cc2f6e;
+  --color-brand-700: #b0245c;
+  --color-brand-800: #8c1f4b;
+  --color-brand-900: #6a1b3b;
+
+  /* Text- und Neutraltöne mit leichtem Pflaumenstich */
+  --color-ink-950: #1e1220;
+  --color-ink-900: #2a1d2c;
+  --color-ink-800: #3d2f40;
+  --color-ink-700: #54465a;
+  --color-ink-600: #6b5e70;
+  --color-ink-500: #8a7f8e;
+  --color-ink-400: #b3aab6;
+  --color-ink-300: #d7d0d9;
+  --color-ink-200: #eae4eb;
+  --color-ink-100: #f5f1f5;
+  --color-ink-50: #faf8fa;
+
+  /* Flächen & Linien */
+  --color-canvas: #fffbfc;
+  --color-surface: #ffffff;
+  --color-line: #f1e3ea;
+  --color-line-strong: #e5cfda;
+
+  /* Semantische Statusfarben */
+  --color-success-50: #ecfdf3;
+  --color-success-200: #bbf7d0;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+  --color-warning-50: #fff8eb;
+  --color-warning-200: #fde2b5;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-danger-50: #fff1f3;
+  --color-danger-200: #fecdd6;
+  --color-danger-600: #e11d48;
+  --color-danger-700: #be123c;
+  --color-info-50: #eff6ff;
+  --color-info-200: #bfdbfe;
+  --color-info-700: #1d4ed8;
+  /* Testmodus – bewusst andere Farbwelt als die Marke */
+  --color-test-50: #f5f3ff;
+  --color-test-200: #ddd6fe;
+  --color-test-700: #6d28d9;
+  --color-live: #e11d48;
+
+  /* Radien */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+  --radius-3xl: 2.25rem;
+
+  /* Schatten – weich und leicht rosé getönt */
+  --shadow-xs: 0 1px 2px rgb(106 27 59 / 0.05);
+  --shadow-soft: 0 1px 2px rgb(106 27 59 / 0.04), 0 4px 14px rgb(106 27 59 / 0.06);
+  --shadow-card: 0 1px 2px rgb(106 27 59 / 0.04), 0 10px 30px -12px rgb(106 27 59 / 0.14);
+  --shadow-lift: 0 2px 4px rgb(106 27 59 / 0.05), 0 22px 44px -18px rgb(204 47 110 / 0.35);
+  --shadow-glow: 0 0 0 4px rgb(234 90 141 / 0.18);
+
+  /* Bewegung */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --animate-fade-up: fade-up 0.55s var(--ease-out-soft) both;
+  --animate-fade-in: fade-in 0.4s var(--ease-out-soft) both;
+  --animate-scale-in: scale-in 0.22s var(--ease-out-soft) both;
+  --animate-page-in: page-in 0.38s var(--ease-out-soft) both;
+  --animate-live-pulse: live-pulse 1.8s ease-out infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-pop: pop 0.45s var(--ease-out-soft) both;
+  --animate-slide-up: slide-up 0.32s var(--ease-out-soft) both;
+  --animate-slide-in-right: slide-in-right 0.32s var(--ease-out-soft) both;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.96) translateY(6px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes page-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes live-pulse {
+    0% { box-shadow: 0 0 0 0 rgb(225 29 72 / 0.55); }
+    70% { box-shadow: 0 0 0 7px rgb(225 29 72 / 0); }
+    100% { box-shadow: 0 0 0 0 rgb(225 29 72 / 0); }
+  }
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(0, -14px, 0) scale(1.03); }
+  }
+  @keyframes pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    60% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+  @keyframes slide-in-right {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(100%); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-canvas text-ink-900 font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  h1, h2, h3 {
+    @apply text-ink-950;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-ink-950;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+
+  /* Nutzerpräferenz „Bewegung reduzieren“ respektieren */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  dialog::backdrop {
+    background: rgb(30 18 32 / 0.42);
+    backdrop-filter: blur(4px);
+  }
+}
+
+@layer components {
+  /* Dezenter Markenverlauf für Hero- und Akzentflächen */
+  .bg-aurora {
+    background:
+      radial-gradient(60rem 30rem at 85% -10%, rgb(255 210 225 / 0.85), transparent 60%),
+      radial-gradient(40rem 26rem at -10% 10%, rgb(255 232 240 / 0.9), transparent 60%),
+      radial-gradient(30rem 20rem at 60% 110%, rgb(252 176 201 / 0.35), transparent 60%),
+      var(--color-canvas);
+  }
+
+  .text-gradient-brand {
+    background: linear-gradient(100deg, var(--color-brand-700), var(--color-brand-500) 55%, var(--color-brand-400));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--color-ink-100), var(--color-brand-50), var(--color-ink-100));
+    background-size: 200% 100%;
+    @apply animate-shimmer rounded-md;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .form-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5.5 7.5 10 12l4.5-4.5' stroke='%236b5e70' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");
+    background-size: 1.1rem;
+    background-position: right 0.8rem center;
+    background-repeat: no-repeat;
+  }
+
+  .form-checkbox {
+    appearance: none;
+  }
+  .form-checkbox:checked {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5 10.5 8.5 14 15 6.5' stroke='white' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  /* Sicherer Abstand für Geräte mit Home-Indikator (iPhone) */
+  .pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+}

@@ -225,6 +225,36 @@ export async function getStatement(
     .limit(options.limit ?? 100);
 }
 
+/**
+ * Einnahmenaufstellung für Creator: Creator-Anteil je Buchung plus Brutto
+ * (Belastung des Kunden) und Provisionssatz – nachvollziehbare Berechnung.
+ */
+export async function getCreatorEarningsStatement(userId: string, limit = 100) {
+  return getDb()
+    .select({
+      entryId: ledgerEntries.id,
+      creatorShare: ledgerEntries.amount,
+      balanceAfter: ledgerEntries.balanceAfter,
+      createdAt: ledgerEntries.createdAt,
+      kind: ledgerTransactions.kind,
+      description: ledgerTransactions.description,
+      simulated: ledgerTransactions.simulated,
+      commissionBps: ledgerTransactions.commissionBps,
+      referenceId: ledgerTransactions.referenceId,
+      gross: sql<number>`(
+        SELECT coalesce(-sum(e2.amount), 0)::bigint FROM ledger_entries e2
+          JOIN ledger_accounts a2 ON a2.id = e2.account_id
+         WHERE e2.transaction_id = ${ledgerTransactions.id} AND a2.kind = 'customer_wallet'
+      )`.mapWith(Number),
+    })
+    .from(ledgerEntries)
+    .innerJoin(ledgerAccounts, eq(ledgerAccounts.id, ledgerEntries.accountId))
+    .innerJoin(ledgerTransactions, eq(ledgerTransactions.id, ledgerEntries.transactionId))
+    .where(and(eq(ledgerAccounts.ownerUserId, userId), eq(ledgerAccounts.kind, "creator_earnings"), eq(ledgerAccounts.currency, "TEST_COIN")))
+    .orderBy(desc(ledgerEntries.createdAt))
+    .limit(limit);
+}
+
 // ── Testguthaben ────────────────────────────────────────────────────────────
 
 /**

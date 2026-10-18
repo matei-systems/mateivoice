@@ -1,10 +1,11 @@
+import { twMerge } from "tailwind-merge";
 import { brand } from "@/config/platform";
 
 type ClassValue = string | false | null | undefined | 0;
 
-/** Verbindet CSS-Klassen und ignoriert leere Werte. */
+/** Verbindet CSS-Klassen; bei Konflikten gewinnt die zuletzt angegebene Utility-Klasse. */
 export function cn(...classes: ClassValue[]): string {
-  return classes.filter(Boolean).join(" ");
+  return twMerge(classes.filter(Boolean).join(" "));
 }
 
 const coinFormatter = new Intl.NumberFormat(brand.locale, { maximumFractionDigits: 0 });

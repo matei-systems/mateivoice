@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gt, isNull, lt, ne, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt, ne, or } from "drizzle-orm";
 import { getDb, type Executor } from "@/server/db/client";
 import { authSessions, sanctions, users } from "@/server/db/schema";
 import { randomToken, sha256Hex } from "@/server/crypto";
@@ -145,6 +145,21 @@ export async function invalidateAllUserSessions(executor: Executor, userId: stri
         ? and(eq(authSessions.userId, userId), ne(authSessions.id, exceptSessionId))
         : eq(authSessions.userId, userId),
     );
+}
+
+/** Aktive Anmeldungen eines Nutzers (für die Sicherheitsübersicht). */
+export async function listUserSessions(userId: string) {
+  return getDb()
+    .select({
+      id: authSessions.id,
+      createdAt: authSessions.createdAt,
+      lastSeenAt: authSessions.lastSeenAt,
+      expiresAt: authSessions.expiresAt,
+      userAgent: authSessions.userAgent,
+    })
+    .from(authSessions)
+    .where(and(eq(authSessions.userId, userId), gt(authSessions.expiresAt, new Date())))
+    .orderBy(desc(authSessions.lastSeenAt));
 }
 
 export async function markSessionMfaVerified(sessionId: string) {

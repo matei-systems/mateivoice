@@ -12,7 +12,7 @@ export const brand = {
   name: process.env.NEXT_PUBLIC_PLATFORM_NAME?.trim() || "Project Aurora",
   tagline: "Live. Persönlich. Mit Respekt.",
   description:
-    "Live-Streams und private 1:1-Videochats mit verifizierten erwachsenen Creatorn – mit klaren Preisen, fairen Regeln und Sicherheit von Anfang an.",
+    "Live-Streams und private 1:1-Videochats mit erwachsenen Creatorn – mit klaren Preisen, fairen Regeln und Sicherheit von Anfang an.",
   /** Erster Markt. Expansion (DE, weitere EU-Länder) ist architektonisch vorbereitet. */
   market: "AT",
   locale: "de-AT",
