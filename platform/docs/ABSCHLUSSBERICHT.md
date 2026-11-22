@@ -44,7 +44,7 @@ Branch: `claude/aurora-platform-foundation` · Verzeichnis `platform/` · Kein P
 ## C. Getestet
 - **Unit + Integration: 185/185** (16 Dateien) · **E2E: 37/37** (Desktop + Mobil, Produktions-Build)
 - Typecheck ✅ · Lint ✅ (0/0) · Build ✅ · `pnpm audit --prod` ✅ keine bekannten Lücken
-- 22 Journeys: 17 vollständig automatisiert, 5 im Sandbox-/Mock-Modus (Details in [TESTING.md](TESTING.md)).
+- 22 Journeys: 18 vollständig automatisiert, 4 im Sandbox-/Mock-Modus mit blockiertem Echtanbieter (Details in [TESTING.md](TESTING.md)).
 
 ## D. Blockiert (externe Abhängigkeiten)
 | Punkt | Grund |
