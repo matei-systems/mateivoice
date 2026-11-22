@@ -11,6 +11,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Checkbox, Field, Input } from "@/components/ui/form";
 import { DescriptionList, PageHeader } from "@/components/ui/misc";
 import { roleLabel } from "@/lib/labels";
+import { isStaffRole } from "@/server/auth/permissions";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Einstellungen" };
@@ -68,7 +69,7 @@ export default async function SettingsPage() {
           >
             <Download className="size-4" aria-hidden="true" /> Meine Daten exportieren (JSON)
           </a>
-          {account.role !== "admin" ? (
+          {!isStaffRole(account.role) ? (
             <Dialog
               trigger="Konto löschen"
               triggerVariant="danger"

@@ -8,7 +8,7 @@ import { randomToken } from "@/server/crypto";
 import { AppError, featureUnavailable, notFound } from "@/server/errors";
 import { InsufficientFundsError, getOrCreateAccount, postTransaction } from "@/server/ledger/service";
 import { log } from "@/server/log";
-import { notify, notifyAdmins } from "@/server/notifications/service";
+import { notify, notifyStaff } from "@/server/notifications/service";
 import { getPaymentProvider, signSimulatedPayload, type PaymentEvent } from "./provider";
 
 /**
@@ -168,7 +168,7 @@ export async function processPaymentEvent(providerName: string, event: PaymentEv
         } catch (error) {
           if (!(error instanceof InsufficientFundsError)) throw error;
           // Guthaben bereits verbraucht → Klärungsfall für Admins (Geschäftsregel offen).
-          await notifyAdmins(tx, {
+          await notifyStaff(tx, "admin.ledger.adjust", {
             type: "payment.chargeback_shortfall",
             title: "Rückbuchung mit Fehlbetrag",
             body: `Bestellung ${order.id}: Das Guthaben reicht für die Rückbuchung nicht aus. Manuelle Prüfung erforderlich.`,

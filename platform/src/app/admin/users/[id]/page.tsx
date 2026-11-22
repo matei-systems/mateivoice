@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { ArrowLeft, Coins, Eye, Gavel } from "lucide-react";
 import { isTestMode } from "@/config/env";
 import { adjustBalanceAction, createSanctionAction, liftSanctionAction, revealEmailAction } from "@/actions/admin";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { getUserForAdmin } from "@/server/admin/service";
 import { getBalance } from "@/server/ledger/service";
 import { listSanctionsForUser } from "@/server/moderation/service";
@@ -25,7 +25,7 @@ export const metadata: Metadata = { title: "Nutzerdetails" };
 export default async function AdminUserPage({ params, searchParams }: PageProps<"/admin/users/[id]">) {
   const { id } = await params;
   const query = await searchParams;
-  await requireAdmin(`/admin/users/${id}`);
+  await requireStaff("admin.users.view", `/admin/users/${id}`);
   const user = await getUserForAdmin(id);
   if (!user) notFound();
   const [sanctions, balance] = await Promise.all([

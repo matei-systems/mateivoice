@@ -190,8 +190,11 @@ export const paymentEvents = pgTable(
 );
 
 /**
- * Creator-Auszahlungen. Vorbereitet, im Prototyp nicht ausführbar.
- * Testmünzen können per Constraint NIE ausgezahlt werden.
+ * Creator-Auszahlungen.
+ *
+ * Echte Auszahlungen (COIN) erfordern einen freigegebenen Auszahlungsanbieter.
+ * Testmünzen dürfen ausschließlich über den Sandbox-Anbieter „ausgezahlt“
+ * werden – dabei wird kein Geld bewegt (per Constraint erzwungen).
  */
 export const payouts = pgTable(
   "payouts",
@@ -206,7 +209,16 @@ export const payouts = pgTable(
     provider: text().notNull(),
     providerReference: text(),
     failureReason: text(),
+    /** Buchung der Reservierung (Creator-Konto → Auszahlungs-Verrechnungskonto). */
     ledgerTransactionId: uuid().references(() => ledgerTransactions.id, { onDelete: "restrict" }),
+    simulated: boolean().notNull().default(false),
+    idempotencyKey: text(),
+    /** Maskiertes Ziel (z. B. „AT** … 1234“) – Bankdaten liegen verschlüsselt im Auszahlungsprofil. */
+    destinationMasked: text(),
+    reviewedById: uuid().references(() => users.id, { onDelete: "restrict" }),
+    reviewedAt: timestamp({ withTimezone: true }),
+    rejectionReason: text(),
+    processedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
       .notNull()
@@ -215,7 +227,35 @@ export const payouts = pgTable(
   },
   (t) => [
     index("payouts_creator_idx").on(t.creatorUserId, t.createdAt),
+    index("payouts_status_idx").on(t.status, t.createdAt),
+    uniqueIndex("payouts_idempotency_unique").on(t.idempotencyKey).where(sql`${t.idempotencyKey} IS NOT NULL`),
     check("payouts_amount_positive", sql`${t.amount} > 0`),
-    check("payouts_no_test_coins", sql`${t.currency} = 'COIN'`),
+    check(
+      "payouts_currency_mode",
+      sql`(${t.currency} = 'COIN' AND NOT ${t.simulated}) OR (${t.currency} = 'TEST_COIN' AND ${t.simulated} AND ${t.provider} = 'sandbox')`,
+    ),
+  ],
+);
+
+/** Auszahlungsprofil eines Creators. IBAN ausschließlich AES-256-GCM-verschlüsselt. */
+export const creatorPayoutProfiles = pgTable(
+  "creator_payout_profiles",
+  {
+    userId: uuid()
+      .primaryKey()
+      .references(() => users.id, { onDelete: "restrict" }),
+    method: text().notNull().default("sepa"),
+    accountHolder: text().notNull(),
+    ibanEncrypted: text().notNull(),
+    ibanLast4: text().notNull(),
+    country: text().notNull(),
+    updatedAt: timestamp({ withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    check("creator_payout_profiles_method", sql`${t.method} IN ('sepa')`),
+    check("creator_payout_profiles_country", sql`${t.country} ~ '^[A-Z]{2}$'`),
   ],
 );

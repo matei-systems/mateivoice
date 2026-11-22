@@ -6,7 +6,7 @@ import { getEnv } from "@/config/env";
 import { hashIp } from "@/server/crypto";
 import { AppError } from "@/server/errors";
 import { safeRedirectPath } from "@/lib/utils";
-import { hasPermission, type Actor, type Permission, type Role } from "./permissions";
+import { hasPermission, isStaffRole, type Actor, type Permission, type Role } from "./permissions";
 import { validateSessionToken, type ValidatedSession } from "./session";
 import type { RequestContext } from "./service";
 
@@ -65,12 +65,17 @@ export async function requireRole(roles: Role[], nextPath?: string): Promise<Val
   return session;
 }
 
-/** Adminbereich: Rolle admin UND bestätigte Zwei-Faktor-Authentifizierung. */
-export async function requireAdmin(nextPath = "/admin"): Promise<ValidatedSession> {
-  const session = await requireRole(["admin"], nextPath);
+/**
+ * Mitarbeiterbereich: Mitarbeiterrolle UND bestätigte Zwei-Faktor-Authentifizierung
+ * UND (optional) die konkrete Berechtigung für die Seite.
+ */
+export async function requireStaff(permission?: Permission, nextPath = "/admin"): Promise<ValidatedSession> {
+  const session = await requireSession(nextPath);
+  if (!isStaffRole(session.user.role)) redirect("/forbidden");
   if (!session.user.totpEnabled) redirect("/account/security?mfa=required");
   if (!session.mfaVerified) redirect(`/login/mfa?next=${encodeURIComponent(nextPath)}`);
   if (session.user.status !== "active") redirect("/forbidden");
+  if (permission && !hasPermission(toActor(session), permission)) redirect("/forbidden");
   return session;
 }
 

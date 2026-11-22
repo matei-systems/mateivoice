@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertOctagon, CalendarClock, CheckCircle2, Coins, Flag, LifeBuoy, Radio, UserRoundCheck, Users } from "lucide-react";
 import { sweepSessionsAction } from "@/actions/admin";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { getDashboardStats } from "@/server/admin/service";
 import { reconcileLedger } from "@/server/ledger/service";
 import { ActionForm } from "@/components/ui/action-form";
@@ -15,7 +15,7 @@ import { formatCoins, formatDateTime } from "@/lib/utils";
 export const metadata: Metadata = { title: "Admin-Dashboard" };
 
 export default async function AdminDashboardPage() {
-  await requireAdmin("/admin");
+  await requireStaff(undefined, "/admin");
   const [stats, reconciliation] = await Promise.all([getDashboardStats(), reconcileLedger()]);
   return (
     <>

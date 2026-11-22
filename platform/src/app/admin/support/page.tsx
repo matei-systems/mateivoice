@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { listTicketsForAdmin } from "@/server/support/service";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -18,7 +18,7 @@ const filters = [
 ] as const;
 
 export default async function AdminSupportPage({ searchParams }: PageProps<"/admin/support">) {
-  await requireAdmin("/admin/support");
+  await requireStaff("admin.support.manage", "/admin/support");
   const params = await searchParams;
   const status = params.status === "closed" ? "closed" : "active";
   const tickets = await listTicketsForAdmin(status);

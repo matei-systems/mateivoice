@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BadgeCheck, Calculator, Coins, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
-import { commission, pricing } from "@/config/platform";
+import { pricing } from "@/config/platform";
+import { currentCommissionBps } from "@/server/ledger/service";
 import { formatBps, splitCommission } from "@/server/ledger/commission";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/misc";
@@ -11,8 +12,9 @@ export const metadata: Metadata = {
   description: "Eigene Preise, transparente Abrechnung und Sicherheit – so funktioniert die Plattform für Creator.",
 };
 
-export default function ForCreatorsPage() {
-  const example = splitCommission(pricing.privateChat.defaultCoinsPerMinute * 10, commission.defaultPlatformBps);
+export default async function ForCreatorsPage() {
+  const platformBps = await currentCommissionBps();
+  const example = splitCommission(pricing.privateChat.defaultCoinsPerMinute * 10, platformBps);
   const features = [
     { icon: SlidersHorizontal, title: "Eigene Preise", text: `Zwischen ${pricing.privateChat.minCoinsPerMinute} und ${pricing.privateChat.maxCoinsPerMinute} Münzen pro Minute – du entscheidest.` },
     { icon: Calculator, title: "Transparente Abrechnung", text: "Jede Minute, jeder Anteil und die Provision sind im Studio einzeln nachvollziehbar." },
@@ -38,7 +40,7 @@ export default function ForCreatorsPage() {
         </div>
         <p className="mt-3 text-sm leading-relaxed text-ink-700">
           10 Minuten privater Chat zu {pricing.privateChat.defaultCoinsPerMinute} Münzen = <strong>{example.gross} Münzen</strong>. Davon Plattformprovision{" "}
-          {formatBps(commission.defaultPlatformBps)} = <strong>{example.platformShare}</strong>, dein Anteil = <strong>{example.creatorShare} Münzen</strong>.
+          {formatBps(platformBps)} = <strong>{example.platformShare}</strong>, dein Anteil = <strong>{example.creatorShare} Münzen</strong>.
         </p>
         <Alert tone="warning" className="mt-4">
           Die Provision ist eine vorläufige Geschäftsentscheidung. Umrechnung von Münzen in Euro, Bemessungsgrundlage, Umsatzsteuer und Auszahlung werden

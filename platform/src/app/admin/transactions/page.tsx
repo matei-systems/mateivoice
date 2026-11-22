@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { CreditCard } from "lucide-react";
 import { isTestMode } from "@/config/env";
 import { reverseTransactionAction, simulateOrderAction, simulatePaymentEventAction } from "@/actions/admin";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { listLedgerTransactions } from "@/server/admin/service";
 import { formatBps } from "@/server/ledger/commission";
 import { listCoinPackages, listRecentOrders } from "@/server/payments/service";
@@ -20,7 +20,7 @@ import { formatCoins, formatDateTime, formatEuroCents } from "@/lib/utils";
 export const metadata: Metadata = { title: "Transaktionen" };
 
 export default async function AdminTransactionsPage() {
-  await requireAdmin("/admin/transactions");
+  await requireStaff("admin.ledger.view", "/admin/transactions");
   const [transactions, orders, packages] = await Promise.all([listLedgerTransactions(150), listRecentOrders(30), listCoinPackages()]);
   return (
     <>

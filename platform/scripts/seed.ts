@@ -20,6 +20,8 @@ async function main() {
   const { grantTestCoins } = await import("@/server/ledger/service");
   const { requestPrivateSession, respondToRequest, joinPrivateSession, leaveSession } = await import("@/server/video/service");
   const { legalDocuments } = await import("@/config/platform");
+  const { TAGS } = await import("@/config/catalog");
+  const { DECLARATION_KINDS, DECLARATION_VERSION } = await import("@/server/compliance/declarations");
 
   const db = getDb();
   const [existing] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, "admin@aurora.test")).limit(1);
@@ -33,6 +35,12 @@ async function main() {
   if (!password || password.length < 12) throw new Error("SEED_DEFAULT_PASSWORD (mind. 12 Zeichen) muss in .env gesetzt sein.");
   const passwordHash = await hashPassword(password);
   const adminTotpSecret = process.env.SEED_ADMIN_TOTP_SECRET || generateTotpSecret();
+  // Jede Mitarbeiterin/jeder Mitarbeiter hat ein eigenes 2FA-Geheimnis (keine geteilten Zugangsdaten).
+  const staffTotp = {
+    moderator: process.env.SEED_MODERATOR_TOTP_SECRET || generateTotpSecret(),
+    support: process.env.SEED_SUPPORT_TOTP_SECRET || generateTotpSecret(),
+    finance: process.env.SEED_FINANCE_TOTP_SECRET || generateTotpSecret(),
+  };
   const now = new Date();
 
   async function consent(userId: string, creator = false) {
@@ -46,7 +54,16 @@ async function main() {
     await db.insert(schema.notificationPreferences).values({ userId }).onConflictDoNothing();
   }
 
-  async function createUser(input: { email: string; username: string; role: "customer" | "creator" | "admin"; verified?: boolean; totp?: string }) {
+  async function createUser(input: {
+    email: string;
+    username: string;
+    role: "customer" | "creator" | "admin" | "moderator" | "support" | "finance";
+    verified?: boolean;
+    totp?: string;
+    country?: string;
+    /** Nur Kunden: simulierte Altersprüfung (Mock-Anbieter, Testmodus – KEINE echte Prüfung). */
+    ageCheck?: boolean;
+  }) {
     const [user] = await db
       .insert(schema.users)
       .values({
@@ -59,16 +76,37 @@ async function main() {
         isTestAccount: true,
         totpSecretEncrypted: input.totp ? encryptField(input.totp) : null,
         totpEnabledAt: input.totp ? now : null,
+        country: input.country ?? "AT",
       })
       .returning();
     await consent(user!.id, input.role === "creator");
+    if (input.ageCheck) {
+      await db.insert(schema.ageVerifications).values({
+        userId: user!.id,
+        provider: "mock",
+        providerReference: `mock_age_seed_${input.username}`,
+        method: "mock",
+        status: "test_passed",
+      });
+    }
     return user!;
   }
 
+  // ── Kategorien (von Mitarbeitern pflegbar) ────────────────────────────────
+  await db
+    .insert(schema.categories)
+    .values(TAGS.map((tag, index) => ({ slug: tag.code, label: tag.label, sortOrder: index * 10, active: true })))
+    .onConflictDoNothing();
+
   // ── Konten ────────────────────────────────────────────────────────────────
-  const admin = await createUser({ email: "admin@aurora.test", username: "admin_test", role: "admin", totp: adminTotpSecret });
-  const customer = await createUser({ email: "kunde@aurora.test", username: "kunde_test", role: "customer" });
+  await createUser({ email: "admin@aurora.test", username: "admin_test", role: "admin", totp: adminTotpSecret });
+  const moderator = await createUser({ email: "moderation@aurora.test", username: "moderation_test", role: "moderator", totp: staffTotp.moderator });
+  await createUser({ email: "support@aurora.test", username: "support_test", role: "support", totp: staffTotp.support });
+  await createUser({ email: "finanzen@aurora.test", username: "finanzen_test", role: "finance", totp: staffTotp.finance });
+  const customer = await createUser({ email: "kunde@aurora.test", username: "kunde_test", role: "customer", ageCheck: true });
   await createUser({ email: "kunde.unbestaetigt@aurora.test", username: "kunde_unbestaetigt", role: "customer", verified: false });
+  // Kunde ohne Altersprüfung (zeigt die Sperre für altersbeschränkte Funktionen)
+  await createUser({ email: "kunde.neu@aurora.test", username: "kunde_neu", role: "customer", country: "DE" });
 
   const creators: {
     email: string;
@@ -104,7 +142,12 @@ async function main() {
   const profiles: Record<string, { id: string; userId: string }> = {};
   let minutesAgo = 0;
   for (const c of creators) {
-    const user = await createUser({ email: c.email, username: c.username, role: "creator" });
+    const user = await createUser({
+      email: c.email,
+      username: c.username,
+      role: "creator",
+      country: ["AT", "DE", "CH"][Object.keys(profiles).length % 3]!,
+    });
     minutesAgo += 17;
     const [profile] = await db
       .insert(schema.creatorProfiles)
@@ -121,7 +164,7 @@ async function main() {
         availability: c.availability,
         reviewStatus: c.review,
         reviewedAt: c.review === "approved" ? now : null,
-        reviewedById: c.review === "approved" ? admin.id : null,
+        reviewedById: c.review === "approved" ? moderator.id : null,
         isTestProfile: true,
         lastOnlineAt: new Date(now.getTime() - minutesAgo * 60_000),
       })
@@ -135,6 +178,12 @@ async function main() {
         providerReference: `mock_seed_${c.username}`,
         status: c.verification,
       });
+    }
+    // Pflichterklärungen (Einwilligung, Rechte an Inhalten) – Entwurf ohne Erklärungen
+    if (c.review !== "draft") {
+      await db.insert(schema.creatorDeclarations).values(
+        DECLARATION_KINDS.map((declaration) => ({ userId: user.id, declaration, version: DECLARATION_VERSION, ipHash: null })),
+      );
     }
     if (c.availability === "live") {
       const [stream] = await db
@@ -201,12 +250,18 @@ async function main() {
   console.log(`\nSeed abgeschlossen für "${dbName}" (${stats.rows[0]?.users} Testkonten).`);
   console.log("──────────────────────────────────────────────────────────────");
   console.log("Testkonten (nur Entwicklung, Passwort aus SEED_DEFAULT_PASSWORD):");
-  console.log("  Admin:    admin@aurora.test   (2FA erforderlich)");
-  console.log("  Kunde:    kunde@aurora.test");
-  console.log("  Creator:  creator@aurora.test (Profil „Aria“)");
-  if (!process.env.SEED_ADMIN_TOTP_SECRET) {
-    console.log(`  Admin-TOTP-Geheimnis (in Authenticator-App eintragen): ${adminTotpSecret}`);
-  }
+  console.log("  Admin:      admin@aurora.test       (2FA erforderlich)");
+  console.log("  Moderation: moderation@aurora.test  (2FA erforderlich)");
+  console.log("  Support:    support@aurora.test     (2FA erforderlich)");
+  console.log("  Finanzen:   finanzen@aurora.test    (2FA erforderlich)");
+  console.log("  Kunde:      kunde@aurora.test       (simulierte Altersprüfung)");
+  console.log("  Kunde neu:  kunde.neu@aurora.test   (ohne Altersprüfung)");
+  console.log("  Creator:    creator@aurora.test     (Profil „Aria“)");
+  // Nur lokal erzeugte Entwicklungs-Geheimnisse anzeigen (nie für echte Konten verwenden).
+  if (!process.env.SEED_ADMIN_TOTP_SECRET) console.log(`  TOTP admin (Entwicklung): ${adminTotpSecret}`);
+  if (!process.env.SEED_MODERATOR_TOTP_SECRET) console.log(`  TOTP moderation (Entwicklung): ${staffTotp.moderator}`);
+  if (!process.env.SEED_SUPPORT_TOTP_SECRET) console.log(`  TOTP support (Entwicklung): ${staffTotp.support}`);
+  if (!process.env.SEED_FINANCE_TOTP_SECRET) console.log(`  TOTP finanzen (Entwicklung): ${staffTotp.finance}`);
   console.log("──────────────────────────────────────────────────────────────\n");
   await closeDb();
 }

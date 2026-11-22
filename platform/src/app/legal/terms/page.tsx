@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { commission, legalDocuments, minimumAge } from "@/config/platform";
+import { currentCommissionBps } from "@/server/ledger/service";
 import { formatBps } from "@/server/ledger/commission";
 import { BulletList, OpenPoint, ProsePage, ProseSection } from "@/components/content/prose-page";
 
 export const metadata: Metadata = { title: "Nutzungsbedingungen (Entwurf)" };
 
-export default function TermsPage() {
+export default async function TermsPage() {
+  const platformBps = await currentCommissionBps();
   return (
     <ProsePage eyebrow="Rechtliches" title="Nutzungsbedingungen" draft version={legalDocuments.terms.version}>
       <ProseSection title="1. Geltungsbereich">
@@ -48,7 +50,7 @@ export default function TermsPage() {
       </ProseSection>
       <ProseSection title="6. Plattformprovision (Creator)">
         <p>
-          Vorläufig {formatBps(commission.defaultPlatformBps)} der verbrauchten Münzen. {commission.basisDescription}
+          Vorläufig {formatBps(platformBps)} der verbrauchten Münzen. {commission.basisDescription}
         </p>
       </ProseSection>
       <ProseSection title="7. Haftung, anwendbares Recht, Streitbeilegung">

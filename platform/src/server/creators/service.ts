@@ -2,8 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { isTestMode } from "@/config/env";
-import { pricing } from "@/config/platform";
-import { isLanguageCode, isTagCode, SORT_OPTIONS, type SortOption } from "@/config/catalog";
+import { isLanguageCode, SORT_OPTIONS, type SortOption } from "@/config/catalog";
 import { getDb } from "@/server/db/client";
 import {
   creatorOffers,
@@ -15,13 +14,15 @@ import {
 import { writeAuditLog } from "@/server/audit";
 import { canEditCreatorProfile, hasPermission, type Actor } from "@/server/auth/permissions";
 import { AppError, forbidden, invalidState, notFound, validationError } from "@/server/errors";
-import { notify, notifyAdmins } from "@/server/notifications/service";
-import { verificationDisplay, type VerificationStatus } from "@/lib/verification";
+import { notify, notifyStaff } from "@/server/notifications/service";
+import { creatorCanOperate, verificationDisplay, type VerificationStatus } from "@/lib/verification";
+import { DECLARATION_VERSION, REQUIRED_DECLARATION_COUNT, declarationsComplete } from "@/server/compliance/declarations";
+import { getSettings, listCategories, type Settings } from "@/server/settings/service";
 
 /**
  * Creator-Profile: öffentliche Suche, Profilansicht, Bearbeitung durch den
- * Creator und Prüfung durch Admins. Öffentlich sichtbar sind nur freigegebene
- * Profile aktiver Konten – im Echtbetrieb zusätzlich nur verifizierte Creator.
+ * Creator und Prüfung durch Mitarbeiter. Öffentlich sichtbar sind nur Profile,
+ * deren Veröffentlichungs-Checkliste vollständig ist (siehe getPublicationChecklist).
  */
 
 // Status/Anbieter der neuesten Verifizierung je Creator (korrelierte Unterabfragen)
@@ -37,12 +38,34 @@ const latestVerificationProvider = sql<string | null>`(
    ORDER BY cv.created_at DESC LIMIT 1
 )`;
 
-/** Bedingungen für öffentliche Sichtbarkeit. */
+/** Anzahl aktueller Pflichterklärungen je Creator (korrelierte Unterabfrage). */
+const declarationCount = sql<number>`(
+  SELECT count(DISTINCT cd.declaration)::int FROM creator_declarations cd
+   WHERE cd.user_id = ${creatorProfiles.userId} AND cd.version = ${DECLARATION_VERSION}
+)`;
+
+/**
+ * Bedingungen für öffentliche Sichtbarkeit – ein Profil erscheint erst, wenn
+ * ALLE Prüfungen abgeschlossen sind: Freigabe durch Mitarbeiter, aktives Konto,
+ * Alters-/Identitätsprüfung (echter Anbieter; im Testmodus zusätzlich das
+ * Mock-Ergebnis „test_passed“) und vollständige Einwilligungs-/Rechteerklärungen.
+ */
 function publicVisibilityConditions(): SQL[] {
-  const conditions: SQL[] = [eq(creatorProfiles.reviewStatus, "approved"), eq(users.status, "active")];
-  if (!isTestMode()) {
+  const conditions: SQL[] = [
+    eq(creatorProfiles.reviewStatus, "approved"),
+    eq(users.status, "active"),
+    sql`${declarationCount} >= ${REQUIRED_DECLARATION_COUNT}`,
+  ];
+  if (isTestMode()) {
+    conditions.push(
+      sql`((${latestVerification} = 'verified' AND ${latestVerificationProvider} <> 'mock') OR (${latestVerification} = 'test_passed' AND ${latestVerificationProvider} = 'mock'))`,
+    );
+  } else {
     // Echtbetrieb: nur echte Verifizierung, keine Testprofile.
-    conditions.push(sql`${latestVerification} = 'verified'`, eq(creatorProfiles.isTestProfile, false));
+    conditions.push(
+      sql`${latestVerification} = 'verified' AND ${latestVerificationProvider} <> 'mock'`,
+      eq(creatorProfiles.isTestProfile, false),
+    );
   }
   return conditions;
 }
@@ -51,7 +74,7 @@ export const searchParamsSchema = z.object({
   q: z.string().trim().max(60).optional().catch(undefined),
   availability: z.enum(["all", "live", "online"]).optional().catch(undefined),
   language: z.string().refine(isLanguageCode).optional().catch(undefined),
-  tag: z.string().refine(isTagCode).optional().catch(undefined),
+  tag: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(40).optional().catch(undefined),
   maxPrice: z.coerce.number().int().min(1).max(10_000).optional().catch(undefined),
   sort: z.enum(SORT_OPTIONS.map((o) => o.value) as [SortOption, ...SortOption[]]).optional().catch(undefined),
   page: z.coerce.number().int().min(1).max(500).optional().catch(undefined),
@@ -198,10 +221,13 @@ export async function getCreatorProfileBySlug(slug: string, viewer: Actor | null
     .orderBy(desc(creatorVerifications.createdAt))
     .limit(1);
 
+  const declarationsOk = await declarationsComplete(row.profile.userId);
   const publiclyVisible =
     row.profile.reviewStatus === "approved" &&
     row.userStatus === "active" &&
-    (isTestMode() || (verification?.status === "verified" && !row.profile.isTestProfile));
+    declarationsOk &&
+    creatorCanOperate(verification?.status as VerificationStatus | undefined, verification?.provider, isTestMode()) &&
+    (isTestMode() || !row.profile.isTestProfile);
   if (!publiclyVisible && !isOwner && !isAdmin) return null;
 
   const media = await db
@@ -265,7 +291,7 @@ export const profileUpdateSchema = z.object({
   bio: textField(2000, "Die Beschreibung"),
   contactRules: textField(1000, "Die Regeln für die Kontaktaufnahme"),
   languages: z.array(z.string().refine(isLanguageCode, "Ungültige Sprache")).max(6, "Höchstens 6 Sprachen."),
-  tags: z.array(z.string().refine(isTagCode, "Ungültiges Thema")).max(6, "Höchstens 6 Themen."),
+  tags: z.array(z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Ungültiges Thema")).max(6, "Höchstens 6 Themen."),
   allowSearchIndexing: z.boolean(),
 });
 
@@ -274,6 +300,9 @@ export async function updateOwnProfile(actor: Actor, rawInput: unknown) {
   const parsed = profileUpdateSchema.safeParse(rawInput);
   if (!parsed.success) throw validationError(parsed.error.issues[0]?.message ?? "Ungültige Eingabe.");
   const input = parsed.data;
+  // Themen nur aus den aktiven, von Mitarbeitern gepflegten Kategorien (kein Freitext).
+  const activeCategories = new Set((await listCategories()).map((c) => c.slug));
+  if (input.tags.some((tag) => !activeCategories.has(tag))) throw validationError("Ungültiges Thema.");
   const db = getDb();
   return db.transaction(async (tx) => {
     const [profile] = await tx.select().from(creatorProfiles).where(eq(creatorProfiles.userId, actor.id)).for("update");
@@ -301,7 +330,7 @@ export async function updateOwnProfile(actor: Actor, rawInput: unknown) {
       .where(eq(creatorProfiles.id, profile.id))
       .returning();
     if (needsReview) {
-      await notifyAdmins(tx, {
+      await notifyStaff(tx, "admin.creators.review", {
         type: "creator.review_requested",
         title: "Profiländerung zur Prüfung",
         body: `Das Profil „${input.displayName}“ wurde geändert und wartet auf Prüfung.`,
@@ -312,19 +341,23 @@ export async function updateOwnProfile(actor: Actor, rawInput: unknown) {
   });
 }
 
-export const pricingSchema = z.object({
-  coinsPerMinute: z.coerce
-    .number({ error: "Bitte gib einen Preis an." })
-    .int("Bitte gib eine ganze Zahl an.")
-    .min(pricing.privateChat.minCoinsPerMinute, `Mindestens ${pricing.privateChat.minCoinsPerMinute} Münzen pro Minute.`)
-    .max(pricing.privateChat.maxCoinsPerMinute, `Höchstens ${pricing.privateChat.maxCoinsPerMinute} Münzen pro Minute.`),
-  enabled: z.boolean(),
-});
+/** Preisgrenzen kommen aus den Plattform-Einstellungen (admin-konfigurierbar). */
+export function pricingSchemaFor(limits: Settings["pricing"]) {
+  return z.object({
+    coinsPerMinute: z.coerce
+      .number({ error: "Bitte gib einen Preis an." })
+      .int("Bitte gib eine ganze Zahl an.")
+      .min(limits.privateChatMin, `Mindestens ${limits.privateChatMin} Münzen pro Minute.`)
+      .max(limits.privateChatMax, `Höchstens ${limits.privateChatMax} Münzen pro Minute.`),
+    enabled: z.boolean(),
+  });
+}
 
 /** Preise nur innerhalb der zentral definierten Grenzen. Laufende Sitzungen behalten ihren Preis-Snapshot. */
 export async function updateOwnPricing(actor: Actor, rawInput: unknown) {
   if (!hasPermission(actor, "studio.pricing.edit")) throw forbidden();
-  const parsed = pricingSchema.safeParse(rawInput);
+  const settings = await getSettings();
+  const parsed = pricingSchemaFor(settings.pricing).safeParse(rawInput);
   if (!parsed.success) throw validationError(parsed.error.issues[0]?.message ?? "Ungültiger Preis.");
   const db = getDb();
   const [profile] = await db.select({ id: creatorProfiles.id, userId: creatorProfiles.userId }).from(creatorProfiles).where(eq(creatorProfiles.userId, actor.id)).limit(1);
@@ -333,6 +366,52 @@ export async function updateOwnPricing(actor: Actor, rawInput: unknown) {
     .insert(creatorOffers)
     .values({ creatorProfileId: profile.id, kind: "private_chat", ...parsed.data })
     .onConflictDoUpdate({ target: [creatorOffers.creatorProfileId, creatorOffers.kind], set: { ...parsed.data, updatedAt: new Date() } });
+}
+
+// ── Veröffentlichungs-Checkliste ────────────────────────────────────────────
+
+export type ChecklistItem = { key: string; label: string; done: boolean; hint?: string };
+
+/**
+ * Was fehlt noch bis zur Veröffentlichung? Dieselben Regeln gelten für die
+ * öffentliche Sichtbarkeit (publicVisibilityConditions) und für die Freigabe
+ * durch Mitarbeiter – eine Freigabe ohne vollständige Prüfungen ist nicht möglich.
+ */
+export async function getPublicationChecklist(userId: string): Promise<{ items: ChecklistItem[]; complete: boolean; readyForApproval: boolean }> {
+  const db = getDb();
+  const [row] = await db
+    .select({ profile: creatorProfiles, emailVerifiedAt: users.emailVerifiedAt, userStatus: users.status })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(eq(creatorProfiles.userId, userId))
+    .limit(1);
+  if (!row) return { items: [], complete: false, readyForApproval: false };
+  const [verification] = await db
+    .select({ status: creatorVerifications.status, provider: creatorVerifications.provider })
+    .from(creatorVerifications)
+    .where(eq(creatorVerifications.userId, userId))
+    .orderBy(desc(creatorVerifications.createdAt))
+    .limit(1);
+  const declarationsOk = await declarationsComplete(userId);
+  const verificationOk = creatorCanOperate(verification?.status as VerificationStatus | undefined, verification?.provider, isTestMode());
+  const profileOk = row.profile.bio.trim().length >= 40 && row.profile.tagline.trim().length >= 5;
+  const items: ChecklistItem[] = [
+    { key: "email", label: "E-Mail-Adresse bestätigt", done: !!row.emailVerifiedAt },
+    {
+      key: "verification",
+      label: "Alters- und Identitätsprüfung",
+      done: verificationOk,
+      hint: verification?.status === "test_passed" ? "Nur simuliert (Testmodus) – keine echte Prüfung." : undefined,
+    },
+    { key: "declarations", label: "Einwilligungs- und Rechteerklärungen abgegeben", done: declarationsOk },
+    { key: "profile", label: "Profiltexte vollständig (Kurzbeschreibung, Beschreibung)", done: profileOk },
+    { key: "approval", label: "Profil durch das Team freigegeben", done: row.profile.reviewStatus === "approved" },
+  ];
+  if (!isTestMode() && row.profile.isTestProfile) {
+    items.push({ key: "not_test", label: "Kein Testprofil", done: false, hint: "Testprofile werden im Echtbetrieb nie veröffentlicht." });
+  }
+  const readyForApproval = items.filter((i) => i.key !== "approval").every((i) => i.done) && row.userStatus === "active";
+  return { items, complete: readyForApproval && row.profile.reviewStatus === "approved", readyForApproval };
 }
 
 export async function submitProfileForReview(actor: Actor) {
@@ -349,7 +428,7 @@ export async function submitProfileForReview(actor: Actor) {
       throw validationError("Bitte ergänze eine Kurzbeschreibung (mind. 5 Zeichen) und eine Beschreibung (mind. 40 Zeichen).");
     }
     await tx.update(creatorProfiles).set({ reviewStatus: "pending_review" }).where(eq(creatorProfiles.id, profile.id));
-    await notifyAdmins(tx, {
+    await notifyStaff(tx, "admin.creators.review", {
       type: "creator.review_requested",
       title: "Neues Profil zur Prüfung",
       body: `„${profile.displayName}“ hat das Profil zur Prüfung eingereicht.`,
@@ -425,6 +504,14 @@ export async function reviewProfile(input: {
   return getDb().transaction(async (tx) => {
     const [profile] = await tx.select().from(creatorProfiles).where(eq(creatorProfiles.id, input.profileId)).for("update");
     if (!profile) throw notFound("Profil nicht gefunden.");
+    if (profile.userId === input.adminUserId) throw forbidden("Eigene Profile dürfen nicht selbst geprüft werden.");
+    if (input.decision === "approve") {
+      const checklist = await getPublicationChecklist(profile.userId);
+      if (!checklist.readyForApproval) {
+        const missing = checklist.items.filter((i) => !i.done && i.key !== "approval").map((i) => i.label);
+        throw invalidState(`Freigabe nicht möglich – es fehlt noch: ${missing.join(", ")}.`);
+      }
+    }
     const status = input.decision === "approve" ? "approved" : input.decision === "request_changes" ? "changes_requested" : "suspended";
     await tx
       .update(creatorProfiles)

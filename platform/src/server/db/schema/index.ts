@@ -5,3 +5,6 @@ export * from "./ledger";
 export * from "./video";
 export * from "./moderation";
 export * from "./system";
+export * from "./settings";
+export * from "./social";
+export * from "./compliance";

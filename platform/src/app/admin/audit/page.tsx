@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { listAuditLogs } from "@/server/admin/service";
 import { Card } from "@/components/ui/card";
 import { PageHeader, Pagination } from "@/components/ui/misc";
@@ -10,7 +10,7 @@ import { formatDateTime } from "@/lib/utils";
 export const metadata: Metadata = { title: "Audit-Protokoll" };
 
 export default async function AdminAuditPage({ searchParams }: PageProps<"/admin/audit">) {
-  await requireAdmin("/admin/audit");
+  await requireStaff("admin.audit.view", "/admin/audit");
   const params = await searchParams;
   const page = Math.max(1, Math.min(1000, Number(params.page) || 1));
   const rows = await listAuditLogs(page);

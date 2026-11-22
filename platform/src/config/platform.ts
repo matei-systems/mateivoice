@@ -20,23 +20,22 @@ export const brand = {
 } as const;
 
 /**
- * Plattformprovision.
+ * Plattformprovision – STANDARDWERT.
  *
- * VORLÄUFIGE GESCHÄFTSENTSCHEIDUNG: 30 % (3000 Basispunkte). Bemessungsgrundlage
- * im Prototyp: verbrauchte Münzen einer Leistung (Brutto-Münzverbrauch). Die
- * endgültige Brutto-/Netto-Regel (inkl. USt., Zahlungsgebühren) ist vertraglich
- * und steuerlich noch zu klären – siehe docs/LEGAL-OPEN-QUESTIONS-AT.md.
- *
- * Serverseitig kann der Wert über PLATFORM_COMMISSION_BPS überschrieben werden.
- * Jede Buchung speichert den zum Buchungszeitpunkt gültigen Satz.
+ * Vorläufige Geschäftsentscheidung: 25 % Plattform / 75 % Model (2500 Basispunkte).
+ * Der wirksame Satz wird von Admins in den Plattform-Einstellungen gepflegt
+ * (Historie mit Begründung); dieser Wert gilt nur, solange dort nichts gesetzt ist.
+ * Bemessungsgrundlage im Prototyp: verbrauchte Münzen einer Leistung. Die endgültige
+ * Brutto-/Netto-Regel (inkl. USt., Zahlungsgebühren) ist vertraglich und steuerlich
+ * zu klären – siehe docs/LEGAL-DACH.md. Jede Buchung speichert den gültigen Satz.
  */
 export const commission = {
-  defaultPlatformBps: 3000,
+  defaultPlatformBps: 2500,
   status: "provisional" as const,
   basisDescription:
     "Vorläufig: Anteil an den verbrauchten Münzen einer Leistung. Endgültige Bemessungsgrundlage wird vertraglich und steuerlich geprüft.",
   roundingDescription:
-    "Creator-Anteil wird auf ganze Münzen abgerundet, die Differenz entfällt auf die Plattform. Die Summe entspricht immer dem Münzverbrauch.",
+    "Der Model-Anteil wird auf ganze Münzen abgerundet, die Differenz entfällt auf die Plattform. Die Summe entspricht immer dem Münzverbrauch.",
 };
 
 /** Preisgrenzen, innerhalb derer Creator ihre Preise selbst festlegen. */
@@ -46,6 +45,7 @@ export const pricing = {
     maxCoinsPerMinute: 300,
     defaultCoinsPerMinute: 40,
   },
+  tips: { min: 5, max: 5000 },
 } as const;
 
 /** Regeln für simulierte Testmünzen (nur im Testmodus aktiv). */

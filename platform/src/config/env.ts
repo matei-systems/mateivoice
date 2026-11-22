@@ -39,7 +39,6 @@ const envSchema = z
     IDENTITY_PROVIDER: z.enum(["mock", "none"]).default("mock"),
     STORAGE_DRIVER: z.enum(["local"]).default("local"),
     STORAGE_LOCAL_DIR: z.string().default("./storage"),
-    PLATFORM_COMMISSION_BPS: z.coerce.number().int().min(0).max(10_000).default(3000),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   })
   .superRefine((env, ctx) => {

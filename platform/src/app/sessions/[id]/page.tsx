@@ -25,7 +25,7 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
 
   const counterpartName = view.viewerRole === "creator" ? (view.customerName ?? "Kunde") : view.creator.displayName;
   const split = view.coinsPerMinute != null && view.commissionBps != null ? splitCommission(view.coinsPerMinute, view.commissionBps) : null;
-  const backHref = view.viewerRole === "creator" ? "/studio/sessions" : view.viewerRole === "admin" ? "/admin" : "/account/sessions";
+  const backHref = view.viewerRole === "creator" ? "/studio/sessions" : view.viewerRole === "staff" ? "/admin" : "/account/sessions";
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 pt-6 sm:px-6 lg:pt-10">
@@ -37,7 +37,7 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
           <p className="text-xs font-semibold tracking-[0.14em] text-brand-600 uppercase">Privater 1:1-Chat</p>
           <h1 className="font-display text-3xl font-semibold">mit {counterpartName}</h1>
         </div>
-        {view.viewerRole !== "admin" ? (
+        {view.viewerRole !== "staff" ? (
           <ReportDialog targetType="video_session" targetId={view.id} targetLabel="Sitzung" signedIn triggerLabel="Sitzung melden" />
         ) : null}
       </div>

@@ -1,11 +1,16 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
 // ── Benutzer & Authentifizierung ─────────────────────────────────────────────
-export const userRole = pgEnum("user_role", ["customer", "creator", "admin"]);
+/**
+ * Rollen: Kunden und Creator sowie Mitarbeiterrollen nach dem Prinzip der
+ * minimalen Rechte (admin = Gesamtverantwortung, moderator, support, finance).
+ */
+export const userRole = pgEnum("user_role", ["customer", "creator", "admin", "moderator", "support", "finance"]);
 export const userStatus = pgEnum("user_status", ["active", "suspended", "deleted"]);
 export const authTokenPurpose = pgEnum("auth_token_purpose", [
   "email_verification",
   "password_reset",
+  "staff_invite",
 ]);
 export const consentDocument = pgEnum("consent_document", [
   "terms",
@@ -59,6 +64,7 @@ export const ledgerAccountKind = pgEnum("ledger_account_kind", [
   "system_test_issuance",
   "system_payment_clearing",
   "system_payout_clearing",
+  "system_payout_settled",
 ]);
 export const ledgerTransactionKind = pgEnum("ledger_transaction_kind", [
   "test_credit",
@@ -68,6 +74,8 @@ export const ledgerTransactionKind = pgEnum("ledger_transaction_kind", [
   "chargeback",
   "payout",
   "adjustment",
+  "tip",
+  "payout_settlement",
 ]);
 export const paymentOrderStatus = pgEnum("payment_order_status", [
   "created",
@@ -83,6 +91,9 @@ export const payoutStatus = pgEnum("payout_status", [
   "completed",
   "failed",
   "cancelled",
+  "approved",
+  "rejected",
+  "processing",
 ]);
 
 // ── Video ───────────────────────────────────────────────────────────────────
@@ -115,6 +126,7 @@ export const reportTargetType = pgEnum("report_target_type", [
   "user",
   "video_session",
   "media",
+  "chat_message",
 ]);
 export const reportCategory = pgEnum("report_category", [
   "minor_suspected",
@@ -156,3 +168,32 @@ export const emailOutboxStatus = pgEnum("email_outbox_status", [
   "failed",
   "suppressed",
 ]);
+
+// ── Interaktion, Chat & Community ───────────────────────────────────────────
+export const chatMessageKind = pgEnum("chat_message_kind", ["message", "tip", "system"]);
+
+// ── Compliance ──────────────────────────────────────────────────────────────
+/** Erklärungen von Creatorn (Einwilligung, Rechte, Regeln) – versioniert gespeichert. */
+export const creatorDeclarationKind = pgEnum("creator_declaration_kind", [
+  "adult_and_identity",
+  "sole_performer",
+  "content_rights",
+  "consent_and_no_coercion",
+  "no_recording_distribution",
+  "rules_acknowledged",
+]);
+export const legalHoldTarget = pgEnum("legal_hold_target", ["user", "media", "video_session", "chat_message", "report"]);
+export const privacyRequestKind = pgEnum("privacy_request_kind", ["export", "deletion", "rectification", "objection"]);
+export const privacyRequestStatus = pgEnum("privacy_request_status", ["received", "completed", "rejected", "on_hold"]);
+export const moderationActionKind = pgEnum("moderation_action_kind", [
+  "content_removed",
+  "profile_hidden",
+  "account_suspended",
+  "warning",
+  "message_deleted",
+  "user_muted",
+  "stream_terminated",
+  "restriction_lifted",
+]);
+export const riskSeverity = pgEnum("risk_severity", ["low", "medium", "high"]);
+export const riskStatus = pgEnum("risk_status", ["open", "reviewed", "dismissed"]);

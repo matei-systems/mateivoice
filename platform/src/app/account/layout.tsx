@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Bell, CalendarClock, LayoutDashboard, LifeBuoy, Settings, Shield, Sparkles, Wallet } from "lucide-react";
 import { requireSession } from "@/server/auth/current";
+import { isStaffRole } from "@/server/auth/permissions";
 import { getActiveSanctions } from "@/server/moderation/service";
 import { resendVerificationAction } from "@/actions/auth";
 import { DashboardShell, type DashboardNavItem } from "@/components/layout/dashboard-shell";
@@ -41,7 +42,7 @@ export default async function AccountLayout({ children }: { children: ReactNode 
           <ButtonLink href="/studio" size="sm" variant="secondary" icon={<Sparkles className="size-4" aria-hidden="true" />}>
             Zum Creator-Studio
           </ButtonLink>
-        ) : user.role === "admin" ? (
+        ) : isStaffRole(user.role) ? (
           <ButtonLink href="/admin" size="sm" variant="secondary">
             Zum Adminbereich
           </ButtonLink>

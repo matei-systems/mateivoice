@@ -31,7 +31,7 @@ import {
   markSessionMfaVerified,
 } from "./session";
 import { buildOtpAuthUri, generateTotpSecret, verifyTotp } from "./totp";
-import type { Role } from "./permissions";
+import { isStaffRole, type Role } from "./permissions";
 
 export type RequestContext = { ipHash: string | null; userAgent: string | null };
 
@@ -315,7 +315,7 @@ export async function verifyLoginMfa(input: { sessionId: string; userId: string;
     throw new AppError("unauthenticated", "Der Code ist ungültig oder abgelaufen.");
   }
   await markSessionMfaVerified(input.sessionId);
-  if (user.role === "admin") {
+  if (isStaffRole(user.role)) {
     await writeAuditLog(db, { actorUserId: user.id, action: "auth.admin_mfa_login", ipHash: ctx.ipHash });
   }
 }
@@ -444,7 +444,7 @@ export async function confirmTotpEnrollment(
   if (step === null) throw new AppError("unauthenticated", "Der Code ist ungültig. Prüfe die Uhrzeit deines Geräts.");
   await db.transaction(async (tx) => {
     await tx.update(users).set({ totpEnabledAt: new Date(), totpLastUsedStep: step }).where(eq(users.id, user.id));
-    if (user.role === "admin") {
+    if (isStaffRole(user.role)) {
       await writeAuditLog(tx, { actorUserId: user.id, action: "auth.mfa_enabled", targetType: "user", targetId: user.id, ipHash: ctx.ipHash });
     }
   });
@@ -458,8 +458,8 @@ export async function disableTotp(input: { userId: string; password: string; cod
   if (!user?.totpEnabledAt || !user.totpSecretEncrypted) {
     throw new AppError("invalid_state", "Die Zwei-Faktor-Authentifizierung ist nicht aktiv.");
   }
-  if (user.role === "admin") {
-    throw new AppError("forbidden", "Für Administratoren ist die Zwei-Faktor-Authentifizierung verpflichtend.");
+  if (isStaffRole(user.role)) {
+    throw new AppError("forbidden", "Für Mitarbeiterkonten ist die Zwei-Faktor-Authentifizierung verpflichtend.");
   }
   if (!(await verifyPassword(input.password, user.passwordHash))) {
     throw new AppError("unauthenticated", "Das Passwort ist nicht korrekt.");
@@ -518,7 +518,7 @@ export async function deleteAccount(input: { userId: string; password: string; c
   const db = getDb();
   const [user] = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
   if (!user || user.status === "deleted") throw new AppError("not_found", "Konto nicht gefunden.");
-  if (user.role === "admin") throw new AppError("forbidden", "Admin-Konten werden über den Betrieb deaktiviert.");
+  if (isStaffRole(user.role)) throw new AppError("forbidden", "Mitarbeiterkonten werden über die Mitarbeiterverwaltung deaktiviert.");
   if (!(await verifyPassword(input.password, user.passwordHash))) {
     throw new AppError("unauthenticated", "Das Passwort ist nicht korrekt.");
   }

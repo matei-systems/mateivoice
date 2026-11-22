@@ -40,7 +40,7 @@ describe("Private Sitzungen – Anfrage und Annahme", () => {
     expect(session.status).toBe("active");
     expect(session.chargedMinutes).toBe(1); // erste Minute bei Beginn berechnet
     expect(await getBalance(customer.id, "customer_wallet")).toBe(460);
-    expect(await getBalance(creator.id, "creator_earnings")).toBe(28); // 70 % von 40
+    expect(await getBalance(creator.id, "creator_earnings")).toBe(30); // 75 % von 40 (Standardprovision 25 %)
 
     // 2,5 Minuten später: Minuten 2 und 3 sind fällig
     const later = new Date(session.startedAt!.getTime() + 150_000);
@@ -49,6 +49,7 @@ describe("Private Sitzungen – Anfrage und Annahme", () => {
     expect(ticked.chargedMinutes).toBe(3);
     expect(ticked.totalCoins).toBe(120);
     expect(await getBalance(customer.id, "customer_wallet")).toBe(380);
+    expect(await getBalance(creator.id, "creator_earnings")).toBe(90);
 
     // Wiederholter Herzschlag zur selben Zeit erzeugt keine weitere Buchung
     await heartbeat(actorOf(customer), session.id, later);
@@ -182,7 +183,7 @@ describe("Private Sitzungen – Zugriffskontrolle", () => {
     const admin = await createUser({ role: "admin" });
     const session = await requestPrivateSession(actorOf(customer), profile.id);
     await respondToRequest(actorOf(creator), session.id, "accept");
-    expect((await getSessionView(actorOf(admin), session.id))?.viewerRole).toBe("admin");
+    expect((await getSessionView(actorOf(admin), session.id))?.viewerRole).toBe("staff");
     await expect(joinPrivateSession(actorOf(admin), session.id)).rejects.toMatchObject({ code: "not_found" });
   });
 

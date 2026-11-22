@@ -12,7 +12,7 @@ import {
   videoSessionParticipants,
   videoSessions,
 } from "@/server/db/schema";
-import { canJoinSession, canViewSession, hasPermission, type Actor } from "@/server/auth/permissions";
+import { canJoinSession, canViewSession, hasPermission, isStaffRole, type Actor } from "@/server/auth/permissions";
 import { randomToken } from "@/server/crypto";
 import {
   AppError,
@@ -277,6 +277,8 @@ export async function requestPrivateSession(actor: Actor, creatorProfileId: stri
   const provider = requireProvider();
   await enforceRateLimit(`session-request:${actor.id}`, RATE_LIMITS.sessionRequestsPerUser);
   await sweepSessions();
+  // Provisionssatz wird beim Anlegen als Snapshot gespeichert (spätere Änderungen wirken nicht rückwirkend).
+  const commissionBps = await currentCommissionBps();
   const db = getDb();
   try {
     return await db.transaction(async (tx) => {
@@ -318,7 +320,7 @@ export async function requestPrivateSession(actor: Actor, creatorProfileId: stri
           customerUserId: actor.id,
           status: "requested",
           coinsPerMinute: offer.coinsPerMinute,
-          commissionBps: currentCommissionBps(),
+          commissionBps,
           currency: "TEST_COIN",
           provider: provider.name,
           requestedAt: now,
@@ -478,7 +480,7 @@ export async function joinPrivateSession(actor: Actor, sessionId: string) {
 export async function heartbeat(actor: Actor, sessionId: string, now = new Date()) {
   return getDb().transaction(async (tx) => {
     const session = await lockSession(tx, sessionId);
-    if (!session || !canViewSession(actor, session) || actor.role === "admin") throw notFound("Sitzung nicht gefunden.");
+    if (!session || !canViewSession(actor, session) || isStaffRole(actor.role)) throw notFound("Sitzung nicht gefunden.");
     const updated = await tx
       .update(videoSessionParticipants)
       .set({ lastHeartbeatAt: now })
@@ -659,7 +661,7 @@ export type SessionView = {
   id: string;
   kind: SessionRow["kind"];
   status: SessionStatus;
-  viewerRole: "customer" | "creator" | "admin";
+  viewerRole: "customer" | "creator" | "staff";
   creator: { displayName: string; slug: string };
   customerName: string | null;
   coinsPerMinute: number | null;
@@ -703,7 +705,7 @@ export async function getSessionView(actor: Actor, sessionId: string): Promise<S
   const cutoff = Date.now() - videoConfig.heartbeatTimeoutSeconds * 1000;
   const me = participants.find((p) => p.userId === actor.id);
   const counterpart = participants.find((p) => p.userId !== actor.id && p.lastHeartbeatAt.getTime() > cutoff);
-  const viewerRole = actor.role === "admin" ? "admin" : actor.id === session.creatorUserId ? "creator" : "customer";
+  const viewerRole = isStaffRole(actor.role) ? "staff" : actor.id === session.creatorUserId ? "creator" : "customer";
   return {
     id: session.id,
     kind: session.kind,

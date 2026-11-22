@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { commission, legalDocuments, pricing } from "@/config/platform";
+import { currentCommissionBps } from "@/server/ledger/service";
 import { formatBps } from "@/server/ledger/commission";
 import { BulletList, OpenPoint, ProsePage, ProseSection } from "@/components/content/prose-page";
 
 export const metadata: Metadata = { title: "Creator-Vereinbarung (Entwurf)" };
 
-export default function CreatorAgreementPage() {
+export default async function CreatorAgreementPage() {
+  const platformBps = await currentCommissionBps();
   return (
     <ProsePage eyebrow="Rechtliches" title="Creator-Vereinbarung" draft version={legalDocuments.creatorAgreement.version}>
       <ProseSection title="Voraussetzungen">
@@ -25,7 +27,7 @@ export default function CreatorAgreementPage() {
       </ProseSection>
       <ProseSection title="Provision und Anteil">
         <p>
-          Vorläufige Plattformprovision: {formatBps(commission.defaultPlatformBps)}. {commission.basisDescription} {commission.roundingDescription}
+          Vorläufige Plattformprovision: {formatBps(platformBps)}. {commission.basisDescription} {commission.roundingDescription}
         </p>
         <OpenPoint>
           Vertragsmodell (Vermittlung vs. eigene Leistung der Plattform), Bemessungsgrundlage (brutto/netto, Umsatzsteuer, Zahlungsgebühren),

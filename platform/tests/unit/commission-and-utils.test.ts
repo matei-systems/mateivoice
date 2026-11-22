@@ -5,8 +5,10 @@ import { formatCoins, formatDuration, formatEuroCents, safeRedirectPath, viennaD
 import { EnvValidationError, parseEnv } from "@/config/env";
 
 describe("Provisionsberechnung", () => {
-  it("verwendet zentral konfigurierte 30 % als Standard", () => {
-    expect(commission.defaultPlatformBps).toBe(3000);
+  it("verwendet 25 % Plattform / 75 % Model als Standard (admin-konfigurierbar)", () => {
+    expect(commission.defaultPlatformBps).toBe(2500);
+    expect(splitCommission(100, 2500)).toEqual({ gross: 100, platformShare: 25, creatorShare: 75, platformBps: 2500 });
+    // Andere Sätze funktionieren ohne Codeänderung
     expect(splitCommission(100, 3000)).toEqual({ gross: 100, platformShare: 30, creatorShare: 70, platformBps: 3000 });
   });
 
@@ -68,7 +70,8 @@ describe("Umgebungsvalidierung", () => {
   it("akzeptiert eine gültige Entwicklungskonfiguration", () => {
     const env = parseEnv({ ...base, APP_ENV: "development" });
     expect(env.TEST_MODE).toBe(true);
-    expect(env.PLATFORM_COMMISSION_BPS).toBe(3000);
+    // Provision ist keine Umgebungsvariable mehr (Plattform-Einstellungen)
+    expect("PLATFORM_COMMISSION_BPS" in env).toBe(false);
   });
 
   it("verbietet Testmodus und Mock-Anbieter in Produktion", () => {

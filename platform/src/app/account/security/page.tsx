@@ -9,6 +9,7 @@ import {
   startTotpAction,
 } from "@/actions/account";
 import { requireSession } from "@/server/auth/current";
+import { isStaffRole } from "@/server/auth/permissions";
 import { getPendingTotpEnrollment } from "@/server/auth/service";
 import { listUserSessions } from "@/server/auth/session";
 import { ActionForm } from "@/components/ui/action-form";
@@ -45,8 +46,8 @@ export default async function SecurityPage({ searchParams }: PageProps<"/account
         />
         <CardBody>
           {user.totpEnabled ? (
-            user.role === "admin" ? (
-              <p className="text-sm text-ink-700">Für Administratoren ist die Zwei-Faktor-Authentifizierung verpflichtend und kann nicht deaktiviert werden.</p>
+            isStaffRole(user.role) ? (
+              <p className="text-sm text-ink-700">Für Mitarbeiterkonten ist die Zwei-Faktor-Authentifizierung verpflichtend und kann nicht deaktiviert werden.</p>
             ) : (
               <ActionForm action={disableTotpAction} submitLabel="2FA deaktivieren" submitVariant="outline" className="max-w-md">
                 <Field id="totp-disable-password" label="Passwort">

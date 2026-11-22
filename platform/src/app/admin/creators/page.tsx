@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { listProfilesForAdmin } from "@/server/creators/service";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { formatDateTime } from "@/lib/utils";
 export const metadata: Metadata = { title: "Creator-Prüfung" };
 
 export default async function AdminCreatorsPage() {
-  await requireAdmin("/admin/creators");
+  await requireStaff("admin.creators.review", "/admin/creators");
   const rows = await listProfilesForAdmin();
   return (
     <>

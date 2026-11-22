@@ -63,7 +63,7 @@ export default async function StudioOverviewPage() {
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard tone="brand" label="Einnahmen (Testmünzen)" value={<CoinAmount amount={earnings} size="lg" />} hint="Simuliert – nicht auszahlbar." icon={<Coins className="size-5" aria-hidden="true" />} />
-        <StatCard label="Provision (vorläufig)" value={formatBps(currentCommissionBps())} hint={commission.basisDescription} icon={<Percent className="size-5" aria-hidden="true" />} />
+        <StatCard label="Provision (vorläufig)" value={formatBps(await currentCommissionBps())} hint={commission.basisDescription} icon={<Percent className="size-5" aria-hidden="true" />} />
         <StatCard label="Profilstatus" value={<Badge tone={review.tone}>{review.label}</Badge>} hint={profile.reviewNote ? `Hinweis: ${profile.reviewNote}` : undefined} />
         <StatCard label="Verifizierung" value={<VerificationBadge verification={display} />} hint={display.description} icon={<Users className="size-5" aria-hidden="true" />} />
       </div>

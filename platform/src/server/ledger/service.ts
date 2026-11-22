@@ -1,6 +1,7 @@
 import "server-only";
+import { getSetting } from "@/server/settings/service";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { getEnv, isTestMode } from "@/config/env";
+import { isTestMode } from "@/config/env";
 import { testCoins } from "@/config/platform";
 import { getDb, type Executor, type Transaction } from "@/server/db/client";
 import { ledgerAccounts, ledgerEntries, ledgerTransactions, users } from "@/server/db/schema";
@@ -431,6 +432,7 @@ export async function reconcileLedger(): Promise<ReconciliationResult> {
   };
 }
 
-export function currentCommissionBps(): number {
-  return getEnv().PLATFORM_COMMISSION_BPS;
+/** Aktuell gültiger Plattformanteil (Basispunkte) aus den Plattform-Einstellungen. */
+export async function currentCommissionBps(): Promise<number> {
+  return (await getSetting("commission")).platformBps;
 }

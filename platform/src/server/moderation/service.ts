@@ -12,10 +12,10 @@ import {
   videoSessions,
 } from "@/server/db/schema";
 import { writeAuditLog } from "@/server/audit";
-import { canViewSession, hasPermission, type Actor } from "@/server/auth/permissions";
+import { canViewSession, hasPermission, isStaffRole, type Actor } from "@/server/auth/permissions";
 import { invalidateAllUserSessions } from "@/server/auth/session";
 import { AppError, PG_UNIQUE_VIOLATION, forbidden, invalidState, notFound, pgErrorCode, validationError } from "@/server/errors";
-import { notify, notifyAdmins } from "@/server/notifications/service";
+import { notify, notifyStaff } from "@/server/notifications/service";
 import { RATE_LIMITS, enforceRateLimit } from "@/server/rate-limit";
 import { endSessionByModeration } from "@/server/video/service";
 
@@ -95,7 +95,7 @@ export async function createReport(actor: Actor, rawInput: unknown) {
       .values({ reporterUserId: actor.id, ...input, priority })
       .returning({ id: reports.id });
     if (priority !== "normal") {
-      await notifyAdmins(tx, {
+      await notifyStaff(tx, "admin.reports.manage", {
         type: "report.priority",
         title: priority === "critical" ? "KRITISCHE Meldung eingegangen" : "Dringende Meldung eingegangen",
         body: `Kategorie: ${REPORT_CATEGORIES.find((c) => c.value === input.category)?.label}. Bitte umgehend prüfen.`,
@@ -251,7 +251,7 @@ export async function createSanction(adminUserId: string, rawInput: unknown, ipH
   return getDb().transaction(async (tx) => {
     const [target] = await tx.select().from(users).where(eq(users.id, input.userId)).for("update");
     if (!target || target.status === "deleted") throw notFound("Konto nicht gefunden.");
-    if (target.role === "admin") throw forbidden("Admin-Konten werden über den Betrieb verwaltet.");
+    if (isStaffRole(target.role)) throw forbidden("Mitarbeiterkonten werden über die Mitarbeiterverwaltung verwaltet.");
     const endsAt = input.durationDays ? new Date(Date.now() + input.durationDays * 86_400_000) : null;
     const [sanction] = await tx
       .insert(sanctions)
@@ -373,7 +373,7 @@ export async function createAppeal(actor: Actor, input: { sanctionId: string; me
   try {
     await db.transaction(async (tx) => {
       await tx.insert(appeals).values({ sanctionId: sanction.id, userId: actor.id, message });
-      await notifyAdmins(tx, {
+      await notifyStaff(tx, "admin.sanctions.manage", {
         type: "appeal.created",
         title: "Neuer Einspruch",
         body: "Ein Einspruch gegen eine Maßnahme wartet auf Entscheidung.",

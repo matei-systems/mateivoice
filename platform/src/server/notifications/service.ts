@@ -3,6 +3,7 @@ import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, type Executor } from "@/server/db/client";
 import { notificationPreferences, notifications, users } from "@/server/db/schema";
 import { safeRedirectPath } from "@/lib/utils";
+import { STAFF_ROLES, hasPermission, type Permission } from "@/server/auth/permissions";
 
 /**
  * In-App-Benachrichtigungen. Weitere Kanäle (E-Mail, Push) werden über
@@ -27,12 +28,19 @@ export async function notify(executor: Executor, input: NotificationInput) {
   });
 }
 
-export async function notifyAdmins(executor: Executor, input: Omit<NotificationInput, "userId">) {
-  const admins = await executor
-    .select({ id: users.id })
+/**
+ * Benachrichtigt alle aktiven Mitarbeiter, deren Rolle die angegebene
+ * Berechtigung besitzt (z. B. Moderation bei kritischen Meldungen).
+ */
+export async function notifyStaff(executor: Executor, permission: Permission, input: Omit<NotificationInput, "userId">) {
+  const staff = await executor
+    .select({ id: users.id, role: users.role, status: users.status, emailVerifiedAt: users.emailVerifiedAt })
     .from(users)
-    .where(and(eq(users.role, "admin"), eq(users.status, "active")));
-  for (const admin of admins) await notify(executor, { ...input, userId: admin.id });
+    .where(and(inArray(users.role, [...STAFF_ROLES]), eq(users.status, "active")));
+  for (const member of staff) {
+    const actor = { id: member.id, role: member.role, status: member.status, emailVerified: member.emailVerifiedAt !== null };
+    if (hasPermission(actor, permission)) await notify(executor, { ...input, userId: member.id });
+  }
 }
 
 export async function listNotifications(userId: string, limit = 50) {

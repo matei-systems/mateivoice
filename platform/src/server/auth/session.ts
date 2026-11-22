@@ -14,6 +14,9 @@ import type { Role, UserStatus } from "./permissions";
 const HOUR = 60 * 60 * 1000;
 export const SESSION_TTL_MS: Record<Role, number> = {
   admin: 12 * HOUR,
+  moderator: 12 * HOUR,
+  support: 12 * HOUR,
+  finance: 12 * HOUR,
   creator: 30 * 24 * HOUR,
   customer: 30 * 24 * HOUR,
 };

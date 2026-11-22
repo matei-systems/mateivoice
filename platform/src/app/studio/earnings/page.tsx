@@ -4,7 +4,7 @@ import { commission } from "@/config/platform";
 import { requireRole, toActor } from "@/server/auth/current";
 import { canViewCreatorEarnings } from "@/server/auth/permissions";
 import { formatBps } from "@/server/ledger/commission";
-import { getBalance, getCreatorEarningsStatement } from "@/server/ledger/service";
+import { currentCommissionBps, getBalance, getCreatorEarningsStatement } from "@/server/ledger/service";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -22,7 +22,7 @@ export default async function StudioEarningsPage() {
   const actor = toActor(session)!;
   // Defense in depth: nur eigene Einnahmen.
   if (!canViewCreatorEarnings(actor, actor.id)) return null;
-  const [balance, rows] = await Promise.all([getBalance(actor.id, "creator_earnings"), getCreatorEarningsStatement(actor.id, 200)]);
+  const [balance, rows, bps] = await Promise.all([getBalance(actor.id, "creator_earnings"), getCreatorEarningsStatement(actor.id, 200), currentCommissionBps()]);
   const totals = rows.reduce(
     (acc, row) => ({ gross: acc.gross + row.gross, share: acc.share + row.creatorShare }),
     { gross: 0, share: 0 },
@@ -35,7 +35,7 @@ export default async function StudioEarningsPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard tone="brand" label="Aktueller Saldo" value={<CoinAmount amount={balance} size="lg" />} icon={<Coins className="size-5" aria-hidden="true" />} />
         <StatCard label="Brutto (angezeigte Buchungen)" value={formatCoins(totals.gross)} hint="Von Kunden verbrauchte Münzen" />
-        <StatCard label="Dein Anteil (angezeigte Buchungen)" value={formatCoins(totals.share)} hint={`Vorläufig ${formatBps(commission.defaultPlatformBps)} Provision`} />
+        <StatCard label="Dein Anteil (angezeigte Buchungen)" value={formatCoins(totals.share)} hint={`Aktuell ${formatBps(bps)} Plattformprovision`} />
       </div>
       <Card>
         <CardHeader title="Buchungen" description={commission.roundingDescription} />

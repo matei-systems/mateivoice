@@ -1,4 +1,5 @@
 import type { BadgeTone } from "@/components/ui/badge";
+import { ROLE_LABELS } from "@/server/auth/permissions";
 
 /** Einheitliche deutsche Bezeichnungen und Farbtöne für Status-Werte. */
 
@@ -98,7 +99,7 @@ export const orderStatus: Record<string, { label: string; tone: BadgeTone }> = {
   charged_back: { label: "Rückgebucht", tone: "danger" },
 };
 
-export const roleLabel: Record<string, string> = { customer: "Kunde", creator: "Creator", admin: "Admin" };
+export const roleLabel: Record<string, string> = ROLE_LABELS;
 export const userStatusLabel: Record<string, { label: string; tone: BadgeTone }> = {
   active: { label: "Aktiv", tone: "success" },
   suspended: { label: "Gesperrt", tone: "danger" },

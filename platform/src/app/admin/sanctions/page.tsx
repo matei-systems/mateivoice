@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { decideAppealAction } from "@/actions/admin";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { listOpenAppeals, listRecentSanctions } from "@/server/moderation/service";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 export const metadata: Metadata = { title: "Sanktionen & Einsprüche" };
 
 export default async function AdminSanctionsPage() {
-  await requireAdmin("/admin/sanctions");
+  await requireStaff("admin.sanctions.manage", "/admin/sanctions");
   const [appeals, sanctions] = await Promise.all([listOpenAppeals(), listRecentSanctions()]);
   return (
     <>

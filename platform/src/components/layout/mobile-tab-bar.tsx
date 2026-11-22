@@ -4,15 +4,16 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Bell, Compass, Radio, Sparkles, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isStaffRole, type Role } from "@/server/auth/permissions";
 
 /**
  * Untere Tab-Leiste für Smartphones – daumenfreundlich, eigenständig statt
  * verkleinerter Desktop-Navigation.
  */
-export function MobileTabBar({ role, unread }: { role: "customer" | "creator" | "admin" | null; unread: number }) {
+export function MobileTabBar({ role, unread }: { role: Role | null; unread: number }) {
   const pathname = usePathname();
   const search = useSearchParams().toString();
-  const areaHref = role === "admin" ? "/admin" : role === "creator" ? "/studio" : role === "customer" ? "/account" : "/login";
+  const areaHref = isStaffRole(role) ? "/admin" : role === "creator" ? "/studio" : role === "customer" ? "/account" : "/login";
   const tabs = [
     { href: "/creators", label: "Entdecken", icon: Compass, active: pathname.startsWith("/creators") && !search.includes("availability=live") },
     { href: "/creators?availability=live", label: "Live", icon: Radio, active: pathname === "/creators" && search.includes("availability=live") },

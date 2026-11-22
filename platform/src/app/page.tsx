@@ -15,10 +15,11 @@ import {
   Wallet,
 } from "lucide-react";
 import { TAGS } from "@/config/catalog";
-import { brand, commission, videoSessions } from "@/config/platform";
+import { brand, videoSessions } from "@/config/platform";
 import { isTestMode } from "@/config/env";
 import { countPublicCreators, searchCreators } from "@/server/creators/service";
 import { formatBps } from "@/server/ledger/commission";
+import { currentCommissionBps } from "@/server/ledger/service";
 import { CreatorCard } from "@/components/creators/creator-card";
 import { ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/form";
@@ -82,7 +83,7 @@ const safety = [
   },
 ];
 
-const faqs = [
+const faqItems = (platformBps: number) => [
   {
     q: "Ist die Plattform schon in Betrieb?",
     a: "Nein. Dies ist ein Prototyp im Testmodus. Es gibt keine echten Zahlungen, keine echten Streams und keine echten Creator. Alle Profile sind fiktive Testdaten.",
@@ -101,16 +102,18 @@ const faqs = [
   },
   {
     q: "Ich bin Creator – was verdiene ich?",
-    a: `Die Plattformprovision beträgt vorläufig ${formatBps(commission.defaultPlatformBps)} der verbrauchten Münzen; der Rest ist dein Anteil. Die endgültigen Bedingungen werden vertraglich und steuerlich geprüft.`,
+    a: `Die Plattformprovision beträgt vorläufig ${formatBps(platformBps)} der verbrauchten Münzen; der Rest ist dein Anteil. Die endgültigen Bedingungen werden vertraglich und steuerlich geprüft.`,
   },
 ];
 
 export default async function HomePage() {
-  const [counts, live, featured] = await Promise.all([
+  const [counts, live, featured, platformBps] = await Promise.all([
     countPublicCreators(),
     searchCreators({ availability: "live", page: 1 }),
     searchCreators({ sort: "recommended", page: 1 }),
+    currentCommissionBps(),
   ]);
+  const faqs = faqItems(platformBps);
   const heroCreators = (live.items.length ? live.items : featured.items).slice(0, 3);
   const testMode = isTestMode();
 
@@ -328,7 +331,7 @@ export default async function HomePage() {
               <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">Deine Preise. Deine Regeln. Transparente Abrechnung.</h2>
               <p className="mt-4 max-w-xl leading-relaxed text-white/75">
                 Lege deinen Minutenpreis selbst fest und sieh jede Abrechnung im Detail. Vorläufige Plattformprovision:{" "}
-                <strong className="text-white">{formatBps(commission.defaultPlatformBps)}</strong> – endgültige Bedingungen werden vertraglich geprüft.
+                <strong className="text-white">{formatBps(platformBps)}</strong> – endgültige Bedingungen werden vertraglich geprüft.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 lg:justify-end">

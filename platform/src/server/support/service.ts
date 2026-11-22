@@ -7,7 +7,7 @@ import { writeAuditLog } from "@/server/audit";
 import { hasPermission, type Actor } from "@/server/auth/permissions";
 import { emailSchema, type RequestContext } from "@/server/auth/service";
 import { forbidden, notFound, validationError } from "@/server/errors";
-import { notify, notifyAdmins } from "@/server/notifications/service";
+import { notify, notifyStaff } from "@/server/notifications/service";
 import { RATE_LIMITS, enforceRateLimit } from "@/server/rate-limit";
 
 /**
@@ -56,12 +56,14 @@ export async function createSupportTicket(actor: Actor | null, rawInput: unknown
       .returning({ id: supportTickets.id });
     await tx.insert(supportMessages).values({ ticketId: ticket!.id, authorUserId: actor?.id ?? null, body: input.message });
     if (input.category === "safety") {
-      await notifyAdmins(tx, {
-        type: "support.safety",
-        title: "Support-Anfrage zu Sicherheit",
-        body: input.subject,
-        linkPath: `/admin/support/${ticket!.id}`,
-      });
+      for (const permission of ["admin.support.manage", "admin.reports.manage"] as const) {
+        await notifyStaff(tx, permission, {
+          type: "support.safety",
+          title: "Support-Anfrage zu Sicherheit",
+          body: input.subject,
+          linkPath: `/admin/support/${ticket!.id}`,
+        });
+      }
     }
     return { id: ticket!.id };
   });

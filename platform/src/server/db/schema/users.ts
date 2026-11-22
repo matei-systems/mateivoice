@@ -45,6 +45,8 @@ export const users = pgTable(
     /** Zuletzt verwendeter TOTP-Zeitschritt (Replay-Schutz). */
     totpLastUsedStep: bigint({ mode: "number" }),
     isTestAccount: boolean().notNull().default(false),
+    /** Wohnsitzland (ISO 3166-1 alpha-2) – bestimmt Altersprüfungs- und Steuerregeln. */
+    country: text(),
     lastLoginAt: timestamp({ withTimezone: true }),
     deletedAt: timestamp({ withTimezone: true }),
     ...timestamps,
@@ -59,6 +61,7 @@ export const users = pgTable(
       sql`(${t.status} = 'deleted') = (${t.deletedAt} IS NOT NULL)`,
     ),
     index("users_role_idx").on(t.role),
+    check("users_country_format", sql`${t.country} IS NULL OR ${t.country} ~ '^[A-Z]{2}$'`),
   ],
 );
 

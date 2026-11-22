@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { getConfigOverview } from "@/server/admin/service";
 import { formatBps } from "@/server/ledger/commission";
 import { Alert } from "@/components/ui/alert";
@@ -10,8 +10,8 @@ import { DescriptionList, PageHeader } from "@/components/ui/misc";
 export const metadata: Metadata = { title: "Konfiguration" };
 
 export default async function AdminConfigPage() {
-  await requireAdmin("/admin/config");
-  const config = getConfigOverview();
+  await requireStaff("admin.config.view", "/admin/config");
+  const config = await getConfigOverview();
   return (
     <>
       <PageHeader eyebrow="System" title="Konfiguration" description="Nur nicht geheime Werte. Änderungen erfolgen über Umgebungsvariablen bzw. config/platform.ts und ein Deployment." />

@@ -4,14 +4,14 @@ import { Bell, CalendarClock, LayoutDashboard, LogOut, Settings, Shield, ShieldC
 import { logoutAction } from "@/actions/auth";
 import { Dropdown, type DropdownItem } from "@/components/ui/dropdown";
 import { PlaceholderPortrait } from "@/components/ui/avatar";
+import { ROLE_LABELS, isStaffRole, type Role } from "@/server/auth/permissions";
 
-const roleLabel = { customer: "Kunde", creator: "Creator", admin: "Administrator" } as const;
 
-export function UserMenu({ username, role }: { username: string; role: "customer" | "creator" | "admin" }) {
+export function UserMenu({ username, role }: { username: string; role: Role }) {
   const icon = "size-4 text-ink-500";
   const roleItems: DropdownItem[] =
-    role === "admin"
-      ? [{ type: "link", href: "/admin", label: "Adminbereich", icon: <ShieldCheck className={icon} /> }]
+    isStaffRole(role)
+      ? [{ type: "link", href: "/admin", label: "Mitarbeiterbereich", icon: <ShieldCheck className={icon} /> }]
       : role === "creator"
         ? [
             { type: "link", href: "/studio", label: "Creator-Studio", icon: <Sparkles className={icon} /> },
@@ -38,7 +38,7 @@ export function UserMenu({ username, role }: { username: string; role: "customer
             <span>
               Angemeldet als <strong className="text-ink-900">{username}</strong>
               <br />
-              {roleLabel[role]}
+              {ROLE_LABELS[role]}
             </span>
           ),
         },

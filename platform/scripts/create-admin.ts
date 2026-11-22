@@ -1,7 +1,9 @@
 /**
- * Legt ein Admin-Konto an. Es gibt bewusst KEINE öffentliche Admin-Registrierung.
+ * Legt das ERSTE Mitarbeiterkonto (in der Regel „admin“) an. Es gibt bewusst KEINE
+ * öffentliche Admin-Registrierung. Weitere Mitarbeiter lädt ein Admin im
+ * Mitarbeiterbereich ein (persönliche Einladung, eigenes Passwort, eigene 2FA).
  *
- * Aufruf:  ADMIN_EMAIL=… ADMIN_USERNAME=… ADMIN_PASSWORD=… pnpm admin:create
+ * Aufruf:  ADMIN_EMAIL=… ADMIN_USERNAME=… ADMIN_PASSWORD=… [ADMIN_ROLE=admin|moderator|support|finance] pnpm admin:create
  * Das Passwort wird nicht geloggt. Beim ersten Login ist die Einrichtung der
  * Zwei-Faktor-Authentifizierung verpflichtend.
  */
@@ -13,6 +15,10 @@ async function main() {
   const password = process.env.ADMIN_PASSWORD;
   if (!email || !username || !password) {
     throw new Error("Bitte ADMIN_EMAIL, ADMIN_USERNAME und ADMIN_PASSWORD als Umgebungsvariablen setzen.");
+  }
+  const role = (process.env.ADMIN_ROLE ?? "admin").trim();
+  if (!["admin", "moderator", "support", "finance"].includes(role)) {
+    throw new Error("ADMIN_ROLE muss admin, moderator, support oder finance sein.");
   }
   const { getDb, closeDb } = await import("@/server/db/client");
   const { users, notificationPreferences } = await import("@/server/db/schema");
@@ -33,15 +39,15 @@ async function main() {
         email: parsedEmail,
         username: parsedUsername,
         passwordHash: await hashPassword(parsedPassword.data),
-        role: "admin",
+        role: role as "admin" | "moderator" | "support" | "finance",
         emailVerifiedAt: new Date(),
         adultSelfDeclaredAt: new Date(),
       })
       .returning({ id: users.id });
     await tx.insert(notificationPreferences).values({ userId: user!.id });
-    await writeAuditLog(tx, { actorUserId: null, action: "admin.created_via_cli", targetType: "user", targetId: user!.id });
+    await writeAuditLog(tx, { actorUserId: null, action: "staff.created_via_cli", targetType: "user", targetId: user!.id, metadata: { role } });
   });
-  console.log(`Admin-Konto für ${parsedEmail} angelegt. Beim ersten Login muss 2FA eingerichtet werden.`);
+  console.log(`Mitarbeiterkonto (${role}) für ${parsedEmail} angelegt. Beim ersten Login muss 2FA eingerichtet werden.`);
   await closeDb();
 }
 

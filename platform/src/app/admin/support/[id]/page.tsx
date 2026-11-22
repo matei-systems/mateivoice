@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { replyTicketAction } from "@/actions/admin";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { maskEmail } from "@/server/admin/service";
 import { getTicketForAdmin } from "@/server/support/service";
 import { ActionForm } from "@/components/ui/action-form";
@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Support-Anfrage" };
 
 export default async function AdminTicketPage({ params }: PageProps<"/admin/support/[id]">) {
   const { id } = await params;
-  await requireAdmin(`/admin/support/${id}`);
+  await requireStaff("admin.support.manage", `/admin/support/${id}`);
   const data = await getTicketForAdmin(id);
   if (!data) notFound();
   const st = ticketStatus[data.ticket.status]!;

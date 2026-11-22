@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ClipboardList, Flag, Gavel, LayoutDashboard, LifeBuoy, ReceiptText, Settings2, UserRoundCheck, Users } from "lucide-react";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { DashboardShell, type DashboardNavItem } from "@/components/layout/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 
@@ -21,7 +21,7 @@ const nav: DashboardNavItem[] = [
 
 /** Adminbereich: serverseitig nur mit Rolle „admin“ und bestätigter 2FA erreichbar. */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const session = await requireAdmin("/admin");
+  const session = await requireStaff(undefined, "/admin");
   return (
     <DashboardShell title="Administration" subtitle={session.user.username} nav={nav} accent={<Badge tone="success">2FA bestätigt</Badge>}>
       {children}

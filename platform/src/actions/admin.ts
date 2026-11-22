@@ -174,7 +174,7 @@ export async function replyTicketAction(_prev: ActionState, formData: FormData):
 
 export async function revealEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return runAction(async () => {
-    const { adminId, ipHash } = await admin("admin.users.manage");
+    const { adminId, ipHash } = await admin("admin.users.reveal_pii");
     const reason = formString(formData, "reason");
     if (reason.trim().length < 10) throw new AppError("validation", "Bitte gib eine Begründung an (mind. 10 Zeichen).");
     const email = await revealUserEmail(adminId, formString(formData, "userId"), reason, ipHash);

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { updateReportAction } from "@/actions/admin";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { getReport, resolveReportTargetUser } from "@/server/moderation/service";
 import { ActionForm } from "@/components/ui/action-form";
 import { Alert } from "@/components/ui/alert";
@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: "Meldung" };
 
 export default async function AdminReportPage({ params }: PageProps<"/admin/reports/[id]">) {
   const { id } = await params;
-  await requireAdmin(`/admin/reports/${id}`);
+  await requireStaff("admin.reports.manage", `/admin/reports/${id}`);
   const data = await getReport(id);
   if (!data) notFound();
   const { report } = data;

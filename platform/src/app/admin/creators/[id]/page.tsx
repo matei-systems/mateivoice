@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Check, ExternalLink, X } from "lucide-react";
 import { languageLabel, tagLabel } from "@/config/catalog";
 import { moderateMediaAction, reviewProfileAction } from "@/actions/admin";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { getProfileForAdmin } from "@/server/creators/service";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Profilprüfung" };
 
 export default async function AdminCreatorPage({ params }: PageProps<"/admin/creators/[id]">) {
   const { id } = await params;
-  await requireAdmin(`/admin/creators/${id}`);
+  await requireStaff("admin.creators.review", `/admin/creators/${id}`);
   const data = await getProfileForAdmin(id);
   if (!data) notFound();
   const { profile, offer, verification, media } = data;

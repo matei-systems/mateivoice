@@ -6,10 +6,11 @@ import { Menu, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/actions/auth";
 import { cn } from "@/lib/utils";
+import { isStaffRole, type Role } from "@/server/auth/permissions";
 import { PRIMARY_NAV } from "./main-nav";
 
 /** Vollflächiges Menü für kleine Bildschirme (ergänzt die untere Tab-Leiste). */
-export function MobileMenu({ signedIn, role }: { signedIn: boolean; role: "customer" | "creator" | "admin" | null }) {
+export function MobileMenu({ signedIn, role }: { signedIn: boolean; role: Role | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -29,7 +30,7 @@ export function MobileMenu({ signedIn, role }: { signedIn: boolean; role: "custo
   }, [open]);
 
   const areaLink =
-    role === "admin" ? { href: "/admin", label: "Adminbereich" } : role === "creator" ? { href: "/studio", label: "Creator-Studio" } : { href: "/account", label: "Mein Bereich" };
+    isStaffRole(role) ? { href: "/admin", label: "Mitarbeiterbereich" } : role === "creator" ? { href: "/studio", label: "Creator-Studio" } : { href: "/account", label: "Mein Bereich" };
 
   return (
     <>

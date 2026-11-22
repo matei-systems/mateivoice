@@ -3,7 +3,7 @@ import { commission, pricing } from "@/config/platform";
 import { requireRole } from "@/server/auth/current";
 import { getOwnProfile } from "@/server/creators/service";
 import { formatBps } from "@/server/ledger/commission";
-import { currentCommissionBps } from "@/server/ledger/service";
+import { getSettings } from "@/server/settings/service";
 import { PricingForm } from "@/components/studio/pricing-form";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -15,7 +15,8 @@ export default async function StudioPricingPage() {
   const session = await requireRole(["creator"], "/studio/pricing");
   const own = await getOwnProfile(session.user.id);
   if (!own) return null;
-  const bps = currentCommissionBps();
+  const settings = await getSettings();
+  const bps = settings.commission.platformBps;
   return (
     <>
       <PageHeader eyebrow="Angebot" title="Preise" description="Lege deinen Minutenpreis innerhalb der Plattformgrenzen fest." />
@@ -25,8 +26,8 @@ export default async function StudioPricingPage() {
           <PricingForm
             initialPrice={own.offer?.coinsPerMinute ?? pricing.privateChat.defaultCoinsPerMinute}
             enabled={own.offer?.enabled ?? false}
-            min={pricing.privateChat.minCoinsPerMinute}
-            max={pricing.privateChat.maxCoinsPerMinute}
+            min={settings.pricing.privateChatMin}
+            max={settings.pricing.privateChatMax}
             platformBps={bps}
           />
         </CardBody>

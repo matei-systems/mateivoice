@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { listReports } from "@/server/moderation/service";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -18,7 +18,7 @@ const tabs = [
 ];
 
 export default async function AdminReportsPage({ searchParams }: PageProps<"/admin/reports">) {
-  await requireAdmin("/admin/reports");
+  await requireStaff("admin.reports.manage", "/admin/reports");
   const params = await searchParams;
   const filter = params.status === "closed" ? "closed" : undefined;
   const rows = await listReports({ status: filter });

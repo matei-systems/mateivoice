@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { requireAdmin } from "@/server/auth/current";
+import { requireStaff } from "@/server/auth/current";
 import { listUsers } from "@/server/admin/service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { formatDate } from "@/lib/utils";
 export const metadata: Metadata = { title: "Nutzer" };
 
 export default async function AdminUsersPage({ searchParams }: PageProps<"/admin/users">) {
-  await requireAdmin("/admin/users");
+  await requireStaff("admin.users.view", "/admin/users");
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q.slice(0, 60) : "";
   const role = params.role === "customer" || params.role === "creator" || params.role === "admin" ? params.role : undefined;

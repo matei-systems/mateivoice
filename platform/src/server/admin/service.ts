@@ -1,4 +1,5 @@
 import "server-only";
+import { getSettings } from "@/server/settings/service";
 import { and, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { getEnv } from "@/config/env";
 import { commission, pricing, testCoins, uploads, videoSessions as videoConfig } from "@/config/platform";
@@ -15,6 +16,7 @@ import {
 } from "@/server/db/schema";
 import { writeAuditLog } from "@/server/audit";
 import { notFound } from "@/server/errors";
+import type { Role } from "@/server/auth/permissions";
 import { getEmailAdapter } from "@/server/notifications/email";
 import { getPaymentProvider } from "@/server/payments/provider";
 import { payoutAvailability } from "@/server/payouts/service";
@@ -86,7 +88,7 @@ export function maskEmail(email: string): string {
   return `${local.slice(0, 1)}•••@${domain.replace(/^[^.]+/, (part) => `${part.slice(0, 1)}•••`)}`;
 }
 
-export async function listUsers(filter: { q?: string; role?: "customer" | "creator" | "admin"; status?: "active" | "suspended" | "deleted"; page?: number }) {
+export async function listUsers(filter: { q?: string; role?: Role; status?: "active" | "suspended" | "deleted"; page?: number }) {
   const conditions: SQL[] = [];
   if (filter.q) {
     const pattern = `%${filter.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
@@ -198,8 +200,9 @@ export async function listLedgerTransactions(limit = 100) {
 }
 
 /** Nicht geheime Konfiguration für die Admin-Ansicht. Geheimnisse werden niemals angezeigt. */
-export function getConfigOverview() {
+export async function getConfigOverview() {
   const env = getEnv();
+  const settings = await getSettings();
   return {
     environment: env.APP_ENV,
     testMode: env.TEST_MODE,
@@ -212,7 +215,7 @@ export function getConfigOverview() {
       identity: { name: getIdentityProvider()?.name ?? "keiner", real: getIdentityProvider()?.isReal ?? false },
       storage: { name: env.STORAGE_DRIVER, real: true },
     },
-    commission: { platformBps: env.PLATFORM_COMMISSION_BPS, status: commission.status, basis: commission.basisDescription },
+    commission: { platformBps: settings.commission.platformBps, status: commission.status, basis: commission.basisDescription },
     pricing,
     testCoins,
     videoSessions: videoConfig,

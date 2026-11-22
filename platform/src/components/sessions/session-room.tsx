@@ -24,7 +24,7 @@ export function SessionRoom({
 }: {
   sessionId: string;
   initial: SessionClientState;
-  viewerRole: "customer" | "creator" | "admin";
+  viewerRole: "customer" | "creator" | "staff";
   counterpartName: string;
   coinsPerMinute: number | null;
 }) {
@@ -36,7 +36,7 @@ export function SessionRoom({
   const lastStatus = useRef(initial.status);
 
   const terminal = !!state.status && !["requested", "accepted", "active"].includes(state.status);
-  const isParticipant = viewerRole !== "admin";
+  const isParticipant = viewerRole !== "staff";
 
   const apply = useCallback(
     (next: SessionClientState) => {
