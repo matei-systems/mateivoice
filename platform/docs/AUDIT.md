@@ -67,3 +67,16 @@ Penetrationstest, Betriebs-/Moderationsprozesse mit Personal.
 5. Premium-Dark-Design
 6. LiveKit-Adapter, E-Mail-Templates + SMTP-Adapter
 7. Tests aller Journeys, Security-Review, Dokumentation
+
+
+---
+
+## Nachtrag: Stand nach Umsetzung (22.11.2026)
+
+Alle unter „Defekt“ und „Teilweise“ gelisteten Punkte wurden adressiert:
+- Zahlungs-Webhooks laufen über eine echte HTTP-Route (`/api/webhooks/payments/[provider]`) mit Signatur, Idempotenz und Betragsprüfung.
+- Veröffentlichung verlangt in **allen** Modi Prüfung + Erklärungen + Freigabe; Löschung berücksichtigt Beweissicherung, offene Auszahlungen und echtes Guthaben.
+- Provision 25/75 als Einstellung mit Historie; Auszahlungen mit Workflow; Altersprüfung für Zuschauer; Rollen Moderation/Support/Finanzen.
+- Fehlende Funktionen (Chat, Blockieren, Favoriten, Hilfe-Center, Preise, Risikosignale, Finanzberichte, Mitarbeiterverwaltung, Wartungsmodus, Feature-Flags, Kategorien, Begründungen, dunkles Design) sind implementiert und getestet.
+- Neu gefundene und behobene Befunde: Race-Condition bei parallelen Auszahlungsanträgen und Kauflimits; bekannte Next.js-Sicherheitslücken (Update auf 16.4.5).
+Details: [TESTING.md](TESTING.md), [SECURITY.md](SECURITY.md).

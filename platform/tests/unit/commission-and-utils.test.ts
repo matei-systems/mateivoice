@@ -74,6 +74,15 @@ describe("Umgebungsvalidierung", () => {
     expect("PLATFORM_COMMISSION_BPS" in env).toBe(false);
   });
 
+  it("leere Werte aus .env.example gelten als nicht gesetzt; Anbieter verlangen ihre Zugangsdaten", () => {
+    const env = parseEnv({ ...base, APP_ENV: "development", EMAIL_FROM: "", SMTP_HOST: "", JOBS_SECRET: "", LIVEKIT_URL: "", VEROTEL_SHOP_ID: "" });
+    expect(env.EMAIL_FROM).toBeUndefined();
+    expect(() => parseEnv({ ...base, EMAIL_PROVIDER: "smtp" })).toThrow(EnvValidationError);
+    expect(() => parseEnv({ ...base, VIDEO_PROVIDER: "livekit" })).toThrow(EnvValidationError);
+    expect(() => parseEnv({ ...base, PAYMENT_PROVIDER: "verotel" })).toThrow(EnvValidationError);
+    expect(parseEnv({ ...base, EMAIL_PROVIDER: "smtp", SMTP_HOST: "smtp.example.test", EMAIL_FROM: "noreply@example.test" }).SMTP_PORT).toBe(587);
+  });
+
   it("verbietet Testmodus und Mock-Anbieter in Produktion", () => {
     try {
       parseEnv({ ...base, APP_ENV: "production", APP_URL: "https://example.test" });

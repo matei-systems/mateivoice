@@ -1,5 +1,9 @@
 # Rechtliche Vorbereitung Österreich – offene Fragen
 
+> **Hinweis (Stage 2):** Die erweiterte DACH-Übersicht mit Quellen und Umsetzungsstand steht in
+> [LEGAL-DACH.md](LEGAL-DACH.md). Diese Datei bleibt als ursprüngliche AT-Fragenliste erhalten; Aussagen zur
+> Provision (jetzt Standard 25 % Plattform) und zum KoPl-G (aufgehoben, ersetzt durch DSA/KDD-G) sind dort aktualisiert.
+
 > **Wichtig:** Diese Liste ist eine strukturierte Vorbereitung für die fachliche Beratung (Rechtsanwalt/-anwältin,
 > Steuerberatung, ggf. Datenschutzberatung). Sie ist **keine Rechtsberatung** und enthält **keine Freigaben**.
 > Genannte Gesetze/Regelwerke sind Prüfhinweise; Anwendbarkeit, Schwellenwerte und aktuelle Fassungen sind

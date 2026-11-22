@@ -106,7 +106,9 @@ export class EnvValidationError extends Error {
 }
 
 export function parseEnv(source: Record<string, string | undefined>): Env {
-  const result = envSchema.safeParse(source);
+  // Leere Werte (z. B. „EMAIL_FROM=“ aus .env.example) gelten als nicht gesetzt.
+  const cleaned = Object.fromEntries(Object.entries(source).map(([key, value]) => [key, value === "" ? undefined : value]));
+  const result = envSchema.safeParse(cleaned);
   if (!result.success) {
     // Nur Variablennamen und Regel, niemals Werte ausgeben.
     throw new EnvValidationError(

@@ -15,10 +15,10 @@ Adult-Geschäftsmodell.** Bis dahin laufen Mock/Simulation; `src/config/env.ts` 
 
 | Anbieter | Schnittstelle | Aktuell | Umsetzungsschritte |
 |---|---|---|---|
-| E-Mail | `EmailAdapter` (`server/notifications/email.ts`) | `dev-outbox`, `disabled` | Adapter implementieren, `EMAIL_PROVIDER` erweitern, Abmeldelinks/Einwilligungen für Marketing beachten |
-| Zahlung | `PaymentProvider` (`server/payments/provider.ts`) | `simulated` | `createCheckout`, `verifyWebhook` (Signatur!) implementieren, Webhook-Route anlegen, die `processPaymentEvent` nutzt (Idempotenz vorhanden); `realCoinsEnabled()` erst nach rechtlicher Klärung aktivieren |
-| Auszahlung | `payouts` (`server/payouts/service.ts`) | nicht verfügbar | Anbieter-Adapter, KYC der Creator beim Anbieter, Buchungen `payout` aus `creator_earnings` → `system_payout_clearing` (nur `COIN`) |
-| Video | `VideoProvider` (`server/video/provider.ts`) | `mock` | `createRoom`, `issueJoinToken` (kurzlebig, an Nutzer/Sitzung gebunden), `verifyJoinToken`, Anbieter-Webhooks auf `video_session_events` (Quelle `provider`, Idempotenz über `provider_event_id`) abbilden; Aufzeichnung deaktiviert lassen |
+| E-Mail | `server/email/service.ts` (Warteschlange) | `dev-outbox`, `smtp` (implementiert, gegen lokalen Testempfänger getestet), `disabled` | SMTP-Dienst mit Adult-Erlaubnis wählen, eigene Domain (SPF/DKIM/DMARC), `EMAIL_FROM` setzen |
+| Zahlung | `PaymentProvider` (`server/payments/provider.ts`) | `simulated` (Sandbox), `verotel` (Adapter, Checkout gesperrt) | Freigabe einholen, Testmodus des Anbieters durchspielen, Settlement-Abgleich, dann `realCoinsEnabled()` bewusst freischalten – siehe [PAYMENT-PROVIDERS.md](PAYMENT-PROVIDERS.md) |
+| Auszahlung | `payouts` (`server/payouts/service.ts`) | `sandbox` (Workflow vollständig) | Anbieter-Adapter für Ausführung (SEPA-Batch/API), KYC/DAC7-Daten der Creator |
+| Video | `VideoProvider` (`server/video/provider.ts`) | `mock`, `livekit` (Adapter + Webhooks implementiert) | LiveKit-Server betreiben (Hoster mit Adult-Erlaubnis), E2E-Test – siehe [STREAMING.md](STREAMING.md) |
 | Alters-/ID-Prüfung | `IdentityVerificationProvider` (`server/verification/service.ts`) | `mock` | Start + Webhook → Status `verified`/`rejected`; nur Status und Referenz speichern, keine Ausweisdaten |
 | Speicher | `StorageAdapter` (`server/media/storage.ts`) | `local` | S3-kompatibler, privater Bucket; Auslieferung weiterhin über `/media/[id]` oder signierte, kurzlebige URLs |
 | Captcha (optional) | – | Honeypot | datenschutzfreundlichen Anbieter wählen, CSP anpassen |

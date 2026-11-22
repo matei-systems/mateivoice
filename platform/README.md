@@ -1,52 +1,43 @@
-# Project Aurora – Prototyp einer Live-Webcam-Plattform (18+)
+# Project Aurora – Premium-Live-Webcam-Marktplatz für Erwachsene (DACH, 18+)
 
 > **Arbeitsname.** „Project Aurora“ ist zentral über `NEXT_PUBLIC_PLATFORM_NAME` bzw. `src/config/platform.ts` austauschbar.
 >
-> **Status: Prototyp im Testmodus.** Keine echten Zahlungen, keine echten Streams, keine echte Alters-/Identitätsprüfung,
-> keine echten E-Mails. Alle Profile sind fiktive, gekennzeichnete Testdaten. Rechtstexte sind Entwürfe.
+> **Status: funktionsfähig im Testbetrieb, nicht startbereit für Echtgeld.** Käufe laufen über eine Sandbox
+> (signierte Webhooks, nur Testmünzen ohne Geldwert), Auszahlungen über einen Sandbox-Anbieter, Video ist ohne
+> angebundenen LiveKit-Server simuliert, Altersprüfungen sind simuliert und als solche gekennzeichnet, E-Mails
+> landen in der Entwicklungs-Mailbox (SMTP-Adapter vorhanden). Alle Profile sind fiktive Testdaten. Rechtstexte
+> sind Entwürfe. Echtzahlungen sind im Code gesperrt, bis Anbieterfreigabe und rechtliche Prüfung vorliegen.
 
-Eine Plattform für öffentliche Live-Streams und private 1:1-Videochats zwischen volljährigen Kundinnen/Kunden und
-erwachsenen Creatorn. Erster Markt: Österreich. Architektur, Sicherheit und Buchhaltung sind so angelegt, dass echte
-Anbieter später ohne Umbau angebunden werden können – **erst nach Prüfung und schriftlicher Freigabe**.
+Marktplatz für öffentliche Live-Streams und private 1:1-Videochats zwischen geprüft volljährigen Kundinnen/Kunden
+und erwachsenen Creatorn in **Österreich, Deutschland und der Schweiz**. Provision (Standard **75 % Model / 25 %
+Plattform**) und alle Geschäftsregeln sind im Mitarbeiterbereich konfigurierbar.
 
 ## Inhalt
-
-- [Was funktioniert – ehrliche Statusübersicht](#statusübersicht)
-- [Schnellstart (lokal)](#schnellstart)
-- [Befehle](#befehle)
-- [Testkonten](#testkonten)
-- [Projektstruktur](#projektstruktur)
-- Weiterführend: [Architektur](docs/ARCHITECTURE.md) · [Sicherheit](docs/SECURITY.md) · [Tests](docs/TESTING.md) ·
-  [Rechtliche offene Fragen AT](docs/LEGAL-OPEN-QUESTIONS-AT.md) · [Kosten](docs/COSTS.md) ·
-  [Deployment, Backup & Monitoring](docs/DEPLOYMENT.md) · [Anbieter-Integration](docs/PROVIDER-INTEGRATION.md)
+- [Statusübersicht](#statusübersicht) · [Schnellstart](#schnellstart) · [Befehle](#befehle) · [Testkonten](#testkonten) · [Struktur](#projektstruktur)
+- Weiterführend: [Architektur & ADRs](docs/ARCHITECTURE.md) · [Sicherheit](docs/SECURITY.md) · [Tests & 22 Journeys](docs/TESTING.md) ·
+  [Recht DACH](docs/LEGAL-DACH.md) · [Zahlungsanbieter](docs/PAYMENT-PROVIDERS.md) · [Streaming](docs/STREAMING.md) ·
+  [Deployment & Umgebungsvariablen](docs/DEPLOYMENT.md) · [Kosten](docs/COSTS.md) · [SEO & Marketing](docs/MARKETING.md) ·
+  [Audit](docs/AUDIT.md)
 
 ## Statusübersicht
 
-Legende: ✅ fertig implementiert & getestet · 🟡 teilweise · 🧪 simuliert (Testmodus) · 🎨 nur visuell ·
-🔌 von externem Anbieter abhängig · ⚖️ rechtlich zu prüfen
+Legende: ✅ implementiert & automatisiert getestet · 🧪 im Sandbox-/Mock-Modus · 🔌 externer Anbieter nötig · ⚖️ rechtlich zu prüfen
 
 | Bereich | Status | Anmerkung |
 |---|---|---|
-| Designsystem (Tokens Hellrosa/Weiß/Pink, Komponenten, Animationen, `prefers-reduced-motion`) | ✅ | `src/app/globals.css`, `src/components/ui` |
-| Startseite, Suche/Filter/Sortierung, Creator-Karten, Profilseiten | ✅ | Serverseitige Suche, leere/Lade-/Fehlerzustände |
-| Responsive & mobile Navigation (Tab-Leiste + Menü) | ✅ | E2E-geprüft ohne horizontales Scrollen |
-| Registrierung, Login, Abmelden, E-Mail-Bestätigung, Passwort-Reset | ✅ / 🔌 | E-Mails landen nur in der Dev-Mailbox (`/dev/mailbox`) |
-| Sitzungen, Rollen, Berechtigungen (serverseitig), Rate-Limits, Honeypot | ✅ | Kein Captcha-Anbieter (🔌 optional später) |
-| 2FA (TOTP) – Pflicht für Admins | ✅ | QR-Code, Replay-Schutz, verschlüsselte Geheimnisse |
-| Kunden-Dashboard (Testguthaben, Kontoauszug, Sitzungen, Hinweise, Einstellungen, Datenexport, Kontolöschung) | ✅ | |
-| Creator-Studio (Profil, Bilder, Preise, Live-Status, Anfragen, Einnahmen inkl. Provision) | ✅ | |
-| Auszahlungen | 🎨 🔌 ⚖️ | Vorbereitete Ansicht; Testmünzen per DB-Constraint nie auszahlbar |
-| Admin-Bereich (Dashboard, Nutzer, Profilprüfung, Meldungen, Sanktionen, Einsprüche, Transaktionen, Support, Konfiguration, Audit) | ✅ | 2FA-pflichtig, jede Änderung im unveränderlichen Audit-Log |
-| Münzsystem / Buchungsjournal (doppelte Buchführung, Idempotenz, Parallelität) | ✅ 🧪 | Nur `TEST_COIN`; echte Münzen gesperrt ⚖️ |
-| Münzkauf | 🧪 🔌 ⚖️ | Simulierter Zahlungsanbieter inkl. signierter Webhooks (nur Admin-Simulation) |
-| Video: Sitzungsmodell, Zustandsautomat, Zugriffstoken, Abrechnung pro Minute, Verbindungsabbruch | ✅ 🧪 | Kein Videoanbieter → kein Bild/Ton (🔌) |
-| Alters-/Identitätsprüfung für Creator | 🧪 🔌 ⚖️ | Mock kann per DB-Constraint nie „verifiziert“ erzeugen |
-| Altershinweis für Gäste | ✅ ⚖️ | Selbstauskunft, **keine** Altersverifikation |
-| Moderation (Meldungen mit Priorität, Sanktionen, Einsprüche) | ✅ | Behördliche Meldewege ⚖️ |
-| Support (Kontaktformular, Tickets, Antworten) | ✅ / 🔌 | Antworten an Gäste per E-Mail noch nicht möglich |
-| Benachrichtigungen | ✅ (In-App) / 🔌 (E-Mail/Push) | |
-| SEO (Metadaten, Sitemap, Robots, noindex privater Bereiche) | ✅ | Profile standardmäßig nicht indexiert |
-| Rechtstexte (Impressum, AGB, Datenschutz, Creator-Vereinbarung, Richtlinien) | 🎨 ⚖️ | Entwürfe mit markierten offenen Punkten |
+| Premium-Dark-Design (Tokens, Komponenten, mobil) | ✅ | `src/app/globals.css`; E2E ohne horizontales Scrollen |
+| Öffentliche Seiten: Start, Entdecken/Suche/Filter/Kategorien, Profile, Preise, Hilfe-Center, Kontakt, Sicherheit, Recht | ✅ ⚖️ | Rechtstexte Entwürfe |
+| Registrierung (DACH-Länderauswahl), Login, 2FA, Reset, E-Mail-Bestätigung | ✅ | |
+| Zuschauer-Konto: Guthaben, Käufe, Kaufhistorie, Favoriten, Altersprüfung, Sitzungen, Privatsphäre (Blockierliste, Export, Löschung) | ✅ 🧪 | Altersprüfung: Mock (🔌 Anbieter offen) |
+| Creator-Studio: Profil, Bilder, Preise, Live, Anfragen, Einnahmen, Auszahlungen, Verifizierung, Pflichterklärungen, Checkliste | ✅ 🧪 | Verifizierung: Mock (🔌) |
+| Veröffentlichungsregeln (Prüfung + Erklärungen + Freigabe in allen Modi) | ✅ | |
+| Streaming | 🧪 🔌 | LiveKit-Adapter (Token, Webhooks, keine Aufzeichnung) implementiert; ohne Server simuliert; E2E mit echtem Server **blockiert** |
+| Echtzeit-Chat (SSE + LISTEN/NOTIFY), Trinkgeld, Melden, Blockieren, Stummschalten, Moderation | ✅ | |
+| Münzsystem: Ledger, Sandbox-Kauf, Webhooks, Erstattung, Chargeback, Kauflimits, Risikosignale, Finanzbericht/CSV | ✅ 🧪 | Echtzahlung gesperrt; Verotel-Adapter vorhanden (🔌 ⚖️) |
+| Auszahlungen: SEPA-Profil, Haltefrist, Reservierung, Vier-Augen-Freigabe | ✅ 🧪 | Sandbox-Anbieter; echter Anbieter 🔌 |
+| Compliance: Beweissicherung, Begründungen (DSA Art. 17), Einsprüche, Datenschutzanfragen, Aufbewahrungsjob | ✅ ⚖️ | |
+| Mitarbeiterbereich: 4 Rollen (Admin, Moderation, Support, Finanzen), Einladungen, Einstellungen mit Historie, Wartungsmodus, Feature-Flags, Kategorien, Pakete, Streams, Audit | ✅ | Pflicht-2FA |
+| E-Mails: 17 Vorlagen (Text+HTML), Warteschlange, SMTP-Adapter, Abmeldung | ✅ 🔌 | Versand erst mit eigener Domain/SMTP-Dienst |
 
 ## Schnellstart
 
@@ -83,7 +74,7 @@ pnpm dev                  # http://localhost:3000
 | `pnpm db:migrate` | Migrationen anwenden (additiv, löscht nichts) |
 | `pnpm db:seed` | Testdaten (verweigert Nicht-Entwicklungsdatenbanken) |
 | `pnpm db:reset-dev --yes` | Entwicklungsdatenbank leeren (nur `*_dev`, nur `APP_ENV=development`) |
-| `pnpm admin:create` | Admin-Konto per CLI anlegen (`ADMIN_EMAIL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`) |
+| `pnpm admin:create` | Erstes Mitarbeiterkonto per CLI (`ADMIN_EMAIL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, optional `ADMIN_ROLE`) |
 | `pnpm audit:deps` | Schwachstellen-Prüfung der Produktionsabhängigkeiten |
 
 ## Testkonten
@@ -92,10 +83,14 @@ Nach `pnpm db:seed` (nur Entwicklung; Passwort = `SEED_DEFAULT_PASSWORD` aus `.e
 
 | Rolle | E-Mail | Hinweis |
 |---|---|---|
-| Admin | `admin@aurora.test` | 2FA: TOTP-Geheimnis aus `SEED_ADMIN_TOTP_SECRET` bzw. Seed-Ausgabe |
-| Kunde | `kunde@aurora.test` | mit Testguthaben und Beispielsitzung |
-| Kunde (unbestätigt) | `kunde.unbestaetigt@aurora.test` | zeigt Einschränkungen ohne E-Mail-Bestätigung |
-| Creator | `creator@aurora.test` | Profil „Aria“, freigegeben, Testmodus-Verifizierung |
+| Admin | `admin@aurora.test` | 2FA: `SEED_ADMIN_TOTP_SECRET` bzw. Seed-Ausgabe |
+| Moderation | `moderation@aurora.test` | 2FA: `SEED_MODERATOR_TOTP_SECRET` bzw. Seed-Ausgabe |
+| Support | `support@aurora.test` | 2FA: `SEED_SUPPORT_TOTP_SECRET` bzw. Seed-Ausgabe |
+| Finanzen | `finanzen@aurora.test` | 2FA: `SEED_FINANCE_TOTP_SECRET` bzw. Seed-Ausgabe |
+| Kunde | `kunde@aurora.test` | Testguthaben, simulierte Altersprüfung, Beispielsitzung |
+| Kunde (neu, DE) | `kunde.neu@aurora.test` | ohne Altersprüfung – zeigt die Sperren |
+| Kunde (unbestätigt) | `kunde.unbestaetigt@aurora.test` | Einschränkungen ohne E-Mail-Bestätigung |
+| Creator | `creator@aurora.test` | Profil „Aria“, freigegeben, simulierte Verifizierung, Erklärungen abgegeben |
 
 Es gibt **keine** öffentliche Admin-Registrierung und keine Standard-Zugangsdaten in Produktion (Seed verweigert dort den Start).
 
@@ -106,14 +101,16 @@ platform/
 ├─ drizzle/                  SQL-Migrationen (inkl. Integritäts-Trigger)
 ├─ scripts/                  migrate, seed, reset-dev, create-admin (mit Schutzprüfungen)
 ├─ src/
-│  ├─ app/                   Routen (App Router): Marketing, Auth, /account, /studio, /admin, /sessions
+│  ├─ app/                   Routen: öffentlich, Auth, /account, /studio, /admin, /sessions, /checkout, /api (Webhooks, SSE, Jobs)
 │  ├─ actions/               Server Actions (dünne Schicht: Auth-Prüfung → Service)
 │  ├─ components/            UI-Designsystem (ui/), Layout, Feature-Komponenten
 │  ├─ config/                env.ts (validiert), platform.ts (Geschäftsregeln), catalog.ts
 │  ├─ lib/                   reine Hilfsfunktionen (Formatierung, Labels, Verifizierungslogik)
 │  └─ server/                Geschäftslogik (modularer Monolith)
-│     ├─ auth/  creators/  ledger/  payments/  payouts/  video/  verification/
-│     ├─ moderation/  support/  media/  notifications/  admin/  privacy/
+│     ├─ auth/  staff/  settings/  creators/  compliance/  age/  verification/
+│     ├─ ledger/  payments/  payouts/  tips/  risk/  finance/  email/
+│     ├─ video/  chat/  realtime/  social/  moderation/  support/  media/
+│     ├─ notifications/  admin/  privacy/
 │     └─ db/                 Drizzle-Schema & Client
 └─ tests/  unit/  integration/  e2e/
 ```
