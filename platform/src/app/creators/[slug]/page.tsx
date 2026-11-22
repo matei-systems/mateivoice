@@ -2,13 +2,19 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock3, Eye, Info, Languages, Radio, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowLeft, Clock3, Eye, Heart, Info, Languages, Radio, ShieldCheck, Wallet } from "lucide-react";
 import { languageLabel, tagLabel } from "@/config/catalog";
 import { videoSessions } from "@/config/platform";
 import { getActor } from "@/server/auth/current";
 import { hasPermission } from "@/server/auth/permissions";
 import { getCreatorProfileBySlug } from "@/server/creators/service";
-import { getBalance } from "@/server/ledger/service";
+import { activeCoinCurrency, getBalance } from "@/server/ledger/service";
+import { getAgeAccess } from "@/server/age/service";
+import { getSettings } from "@/server/settings/service";
+import { isFavorite } from "@/server/social/service";
+import { blockUserAction, toggleFavoriteAction } from "@/actions/social";
+import { ActionForm } from "@/components/ui/action-form";
+import { ConfirmActionDialog } from "@/components/ui/confirm-form";
 import { canCreatorOperate } from "@/server/verification/service";
 import { getActiveStream, getOpenSessionForCustomer } from "@/server/video/service";
 import { RequestChatForm } from "@/components/creators/request-chat-form";
@@ -41,12 +47,17 @@ export default async function CreatorProfilePage({ params }: PageProps<"/creator
   if (!data) notFound();
   const { profile, offer, gallery, verification } = data;
 
-  const [stream, canOperate, balance, openSession] = await Promise.all([
+  const isCustomer = actor?.role === "customer";
+  const [stream, canOperate, balance, openSession, favorite, age, settings] = await Promise.all([
     getActiveStream(profile.id),
     canCreatorOperate(profile.userId),
-    actor?.role === "customer" ? getBalance(actor.id, "customer_wallet") : Promise.resolve(null),
-    actor?.role === "customer" ? getOpenSessionForCustomer(actor.id) : Promise.resolve(null),
+    isCustomer ? getBalance(actor!.id, "customer_wallet", activeCoinCurrency()) : Promise.resolve(null),
+    isCustomer ? getOpenSessionForCustomer(actor!.id) : Promise.resolve(null),
+    isCustomer ? isFavorite(actor!.id, profile.id) : Promise.resolve(false),
+    isCustomer ? getAgeAccess(actor!.id) : Promise.resolve(null),
+    getSettings(),
   ]);
+  const coinLabel = activeCoinCurrency() === "TEST_COIN" ? "Testmünzen" : "Münzen";
 
   const privateAvailable = !!offer?.enabled && canOperate && (profile.availability === "online" || profile.availability === "live");
   const minimum = offer ? offer.coinsPerMinute * videoSessions.minimumBalanceMinutes : 0;
@@ -81,6 +92,14 @@ export default async function CreatorProfilePage({ params }: PageProps<"/creator
           : "Bitte bestätige zuerst deine E-Mail-Adresse, um private Chats anfragen zu können."}
       </Alert>
     );
+  } else if (age && !age.allowed) {
+    chatBlock = (
+      <Alert tone="brand" title="Altersprüfung erforderlich" action={<ButtonLink href="/account/age-verification" size="sm">Jetzt prüfen</ButtonLink>}>
+        Private Chats sind erst nach einer Altersprüfung möglich.
+      </Alert>
+    );
+  } else if (!settings.featureFlags.privateChat) {
+    chatBlock = <Alert tone="info">Private Chats sind derzeit deaktiviert.</Alert>;
   } else if (openSession) {
     chatBlock = (
       <Alert tone="info" title="Du hast bereits eine offene Sitzung" action={<ButtonLink href={`/sessions/${openSession.id}`} size="sm">Öffnen</ButtonLink>} />
@@ -89,8 +108,8 @@ export default async function CreatorProfilePage({ params }: PageProps<"/creator
     chatBlock = <Alert tone="info" title="Gerade nicht verfügbar">Der Creator ist derzeit nicht für private Chats online.</Alert>;
   } else if ((balance ?? 0) < minimum) {
     chatBlock = (
-      <Alert tone="warning" title="Nicht genügend Testguthaben" action={<ButtonLink href="/account/wallet" size="sm" variant="secondary">Zum Guthaben</ButtonLink>}>
-        Für eine Anfrage brauchst du mindestens {minimum} Testmünzen.
+      <Alert tone="warning" title="Nicht genügend Guthaben" action={<ButtonLink href="/account/wallet" size="sm" variant="secondary">Münzen kaufen</ButtonLink>}>
+        Für eine Anfrage brauchst du mindestens {minimum} {coinLabel}.
       </Alert>
     );
   } else {
@@ -126,6 +145,17 @@ export default async function CreatorProfilePage({ params }: PageProps<"/creator
                   <h1 className="font-display text-4xl font-semibold tracking-tight">{profile.displayName}</h1>
                   {profile.tagline ? <p className="text-ink-700">{profile.tagline}</p> : null}
                 </div>
+                {isCustomer && data.publiclyVisible ? (
+                  <div className="flex shrink-0 flex-wrap gap-2 pb-1">
+                    {settings.featureFlags.favorites ? (
+                      <ActionForm action={toggleFavoriteAction} submitLabel={favorite ? "Gemerkt" : "Merken"} submitVariant={favorite ? "secondary" : "outline"} submitSize="sm" submitIcon={<Heart className={favorite ? "size-4 fill-current" : "size-4"} aria-hidden="true" />} className="space-y-0">
+                        <input type="hidden" name="creatorProfileId" value={profile.id} />
+                        <input type="hidden" name="favorite" value={favorite ? "false" : "true"} />
+                      </ActionForm>
+                    ) : null}
+                    <ConfirmActionDialog trigger="Blockieren" triggerVariant="ghost" title={`${profile.displayName} blockieren?`} description="Ihr könnt euch danach keine Nachrichten, Anfragen oder Trinkgelder mehr senden. Du kannst das unter „Privatsphäre & Daten“ rückgängig machen." confirmLabel="Blockieren" variant="danger" action={blockUserAction} hiddenFields={{ userId: profile.userId }} />
+                  </div>
+                ) : null}
               </div>
               <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-600">
                 {profile.languages.length > 0 ? (
@@ -156,7 +186,7 @@ export default async function CreatorProfilePage({ params }: PageProps<"/creator
           {/* Live */}
           {stream ? (
             <section className="overflow-hidden rounded-3xl border border-brand-200 bg-surface shadow-card">
-              <div className="relative grid aspect-video place-items-center overflow-hidden bg-ink-950 text-center text-white">
+              <div className="relative grid aspect-video place-items-center overflow-hidden bg-stage text-center text-white">
                 <div className="absolute inset-0 opacity-60 bg-[radial-gradient(circle_at_30%_20%,rgb(234_90_141/0.55),transparent_55%),radial-gradient(circle_at_80%_80%,rgb(176_36_92/0.5),transparent_50%)]" aria-hidden="true" />
                 <div className="relative space-y-3 px-6">
                   <Badge tone="live" className="uppercase">
@@ -253,7 +283,7 @@ export default async function CreatorProfilePage({ params }: PageProps<"/creator
                 </li>
                 {balance !== null ? (
                   <li className="flex items-center gap-2">
-                    <Wallet className="size-3.5 shrink-0 text-brand-600" aria-hidden="true" /> Dein Testguthaben: <CoinAmount amount={balance} size="sm" />
+                    <Wallet className="size-3.5 shrink-0 text-brand-600" aria-hidden="true" /> Dein Guthaben: <CoinAmount amount={balance} size="sm" test={coinLabel === "Testmünzen"} />
                   </li>
                 ) : null}
               </ul>

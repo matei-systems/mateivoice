@@ -2,7 +2,7 @@ import "server-only";
 import { and, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import { isTestMode } from "@/config/env";
 import { videoSessions as videoConfig } from "@/config/platform";
-import { getDb, type Transaction } from "@/server/db/client";
+import { getDb, type Executor, type Transaction } from "@/server/db/client";
 import {
   creatorOffers,
   creatorProfiles,
@@ -34,6 +34,10 @@ import {
 import { notify } from "@/server/notifications/service";
 import { RATE_LIMITS, enforceRateLimit } from "@/server/rate-limit";
 import { creatorCanOperate, type VerificationStatus } from "@/lib/verification";
+import { assertViewerAgeAccess } from "@/server/age/service";
+import { declarationsComplete } from "@/server/compliance/declarations";
+import { getSettings } from "@/server/settings/service";
+import { isBlockedBetween } from "@/server/social/service";
 import { getVideoProvider } from "./provider";
 import { dueMinutes, isTerminal, nextStatus, type SessionStatus } from "./state-machine";
 
@@ -79,7 +83,7 @@ async function recordEvent(
   });
 }
 
-async function latestVerification(tx: Transaction, userId: string) {
+async function latestVerification(tx: Executor, userId: string) {
   const [row] = await tx
     .select({ status: creatorVerifications.status, provider: creatorVerifications.provider })
     .from(creatorVerifications)
@@ -89,9 +93,11 @@ async function latestVerification(tx: Transaction, userId: string) {
   return row ?? null;
 }
 
-async function creatorMayOperate(tx: Transaction, userId: string) {
+/** Darf ein Creator Live-Funktionen nutzen? Verifizierung (bzw. Test-Mock) UND vollständige Pflichterklärungen. */
+export async function creatorMayOperate(tx: Executor, userId: string) {
   const verification = await latestVerification(tx, userId);
-  return creatorCanOperate(verification?.status as VerificationStatus | undefined, verification?.provider, isTestMode());
+  if (!creatorCanOperate(verification?.status as VerificationStatus | undefined, verification?.provider, isTestMode())) return false;
+  return declarationsComplete(userId, tx);
 }
 
 async function setAvailabilityIf(
@@ -275,6 +281,9 @@ export async function requestPrivateSession(actor: Actor, creatorProfileId: stri
     throw forbidden(actor.emailVerified ? undefined : "Bitte bestätige zuerst deine E-Mail-Adresse.");
   }
   const provider = requireProvider();
+  const settings = await getSettings();
+  if (!settings.featureFlags.privateChat) throw featureUnavailable("Private Chats sind derzeit deaktiviert.");
+  await assertViewerAgeAccess(actor);
   await enforceRateLimit(`session-request:${actor.id}`, RATE_LIMITS.sessionRequestsPerUser);
   await sweepSessions();
   // Provisionssatz wird beim Anlegen als Snapshot gespeichert (spätere Änderungen wirken nicht rückwirkend).
@@ -292,6 +301,7 @@ export async function requestPrivateSession(actor: Actor, creatorProfileId: stri
         throw notFound("Dieser Creator ist nicht verfügbar.");
       }
       const profile = row.profile;
+      if (await isBlockedBetween(tx, actor.id, profile.userId)) throw notFound("Dieser Creator ist nicht verfügbar.");
       if (!(await creatorMayOperate(tx, profile.userId))) {
         throw invalidState("Dieser Creator kann derzeit keine privaten Chats anbieten.");
       }
@@ -565,9 +575,10 @@ export async function setAvailability(actor: Actor, availability: "online" | "of
       }
 
       // availability === "live"
+      if (!(await getSettings()).featureFlags.publicStreams) throw featureUnavailable("Öffentliche Streams sind derzeit deaktiviert.");
       if (profile.reviewStatus !== "approved") throw invalidState("Dein Profil muss zuerst freigegeben werden.");
       if (!(await creatorMayOperate(tx, actor.id))) {
-        throw invalidState("Live-Funktionen sind erst nach erfolgreicher Alters- und Identitätsprüfung verfügbar.");
+        throw invalidState("Live-Funktionen sind erst nach Alters- und Identitätsprüfung und vollständigen Pflichterklärungen verfügbar.");
       }
       const provider = requireProvider();
       if (!stream) {
@@ -598,6 +609,9 @@ export async function setAvailability(actor: Actor, availability: "online" | "of
 
 export async function joinPublicStream(actor: Actor, creatorProfileId: string) {
   const provider = requireProvider();
+  const settings = await getSettings();
+  if (!settings.featureFlags.publicStreams) throw featureUnavailable("Öffentliche Streams sind derzeit deaktiviert.");
+  await assertViewerAgeAccess(actor);
   return getDb().transaction(async (tx) => {
     const [stream] = await tx
       .select()
@@ -614,6 +628,15 @@ export async function joinPublicStream(actor: Actor, creatorProfileId: string) {
     if (!canJoinSession(actor, stream)) throw forbidden("Bitte melde dich mit einem Kundenkonto an, um Streams anzusehen.");
     const role = actor.id === stream.creatorUserId ? "creator" : "viewer";
     const now = new Date();
+    if (role === "viewer") {
+      if (await isBlockedBetween(tx, actor.id, stream.creatorUserId)) throw forbidden("Dieser Stream ist für dich nicht verfügbar.");
+      const cutoff = new Date(now.getTime() - settings.streaming.heartbeatTimeoutSeconds * 1000);
+      const [viewers] = await tx
+        .select({ value: sql<number>`count(*)::int` })
+        .from(videoSessionParticipants)
+        .where(and(eq(videoSessionParticipants.sessionId, stream.id), eq(videoSessionParticipants.role, "viewer"), isNull(videoSessionParticipants.leftAt), gt(videoSessionParticipants.lastHeartbeatAt, cutoff), sql`${videoSessionParticipants.userId} <> ${actor.id}`));
+      if ((viewers?.value ?? 0) >= settings.streaming.maxViewersPerStream) throw new AppError("invalid_state", "Dieser Stream hat die maximale Zuschauerzahl erreicht.");
+    }
     await tx
       .insert(videoSessionParticipants)
       .values({ sessionId: stream.id, userId: actor.id, role, joinedAt: now, lastHeartbeatAt: now })

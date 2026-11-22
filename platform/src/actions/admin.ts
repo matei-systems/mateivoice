@@ -1,18 +1,14 @@
 "use server";
 
 import { refresh } from "next/cache";
-import { eq } from "drizzle-orm";
 import type { ActionState } from "@/lib/action-state";
 import { assertPermission, getRequestContext } from "@/server/auth/current";
 import { revealUserEmail } from "@/server/admin/service";
 import { reviewProfile } from "@/server/creators/service";
-import { getDb } from "@/server/db/client";
-import { users } from "@/server/db/schema";
 import { AppError } from "@/server/errors";
-import { adjustTestBalance, recordChargeback, refundTransaction } from "@/server/ledger/service";
+import { adjustTestBalance, refundTransaction } from "@/server/ledger/service";
 import { moderateMedia } from "@/server/media/service";
 import { createSanction, decideAppeal, liftSanction, updateReport } from "@/server/moderation/service";
-import { buildSimulatedEvent, createSimulatedOrder, getOrder, handlePaymentWebhook } from "@/server/payments/service";
 import { replyToTicket } from "@/server/support/service";
 import { sweepSessions } from "@/server/video/service";
 import { formBool, formString, runAction } from "./helpers";
@@ -107,11 +103,9 @@ export async function decideAppealAction(_prev: ActionState, formData: FormData)
 export async function reverseTransactionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return runAction(async () => {
     const { adminId, ipHash } = await admin("admin.ledger.adjust");
-    const input = { originalTransactionId: formString(formData, "transactionId"), adminUserId: adminId, reason: formString(formData, "reason"), ipHash };
-    if (formString(formData, "kind") === "chargeback") await recordChargeback(input);
-    else await refundTransaction(input);
+    await refundTransaction({ originalTransactionId: formString(formData, "transactionId"), adminUserId: adminId, reason: formString(formData, "reason"), ipHash });
     refresh();
-  }, "Gegenbuchung erstellt (simuliert) und protokolliert.");
+  }, "Kulanzerstattung gebucht und protokolliert.");
 }
 
 export async function adjustBalanceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -127,33 +121,6 @@ export async function adjustBalanceAction(_prev: ActionState, formData: FormData
     });
     refresh();
   }, "Testguthaben korrigiert und protokolliert.");
-}
-
-export async function simulateOrderAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return runAction(async () => {
-    const { adminId, ipHash } = await admin("admin.payments.simulate");
-    const username = formString(formData, "username").trim();
-    const [customer] = await getDb().select({ id: users.id }).from(users).where(eq(users.username, username)).limit(1);
-    if (!customer) throw new AppError("not_found", "Kein Konto mit diesem Nutzernamen gefunden.");
-    const order = await createSimulatedOrder({ adminUserId: adminId, customerUserId: customer.id, packageId: formString(formData, "packageId"), ipHash });
-    refresh();
-    return { status: "success", message: "Simulierte Bestellung angelegt (Status: ausstehend).", data: { orderId: order.id } };
-  });
-}
-
-export async function simulatePaymentEventAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return runAction(async () => {
-    await admin("admin.payments.simulate");
-    const order = await getOrder(formString(formData, "orderId"));
-    if (!order?.simulated) throw new AppError("not_found", "Simulierte Bestellung nicht gefunden.");
-    const type = formString(formData, "type");
-    if (type !== "payment.confirmed" && type !== "payment.failed" && type !== "payment.charged_back") throw new AppError("validation", "Ungültiges Ereignis.");
-    // Läuft durch denselben Pfad wie ein echter Webhook (Signaturprüfung + Idempotenz).
-    const { rawBody, signature } = buildSimulatedEvent(order, type, type === "payment.failed" ? "Simulierte Ablehnung" : undefined);
-    const result = await handlePaymentWebhook(rawBody, signature);
-    refresh();
-    return { status: "success", message: `Simuliertes Ereignis verarbeitet: ${result}.` };
-  });
 }
 
 export async function replyTicketAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -184,7 +151,7 @@ export async function revealEmailAction(_prev: ActionState, formData: FormData):
 
 export async function sweepSessionsAction(_prev: ActionState): Promise<ActionState> {
   return runAction(async () => {
-    await admin("admin.access");
+    await admin("admin.streams.manage");
     const result = await sweepSessions();
     refresh();
     return { status: "success", message: `Bereinigt: ${result.expired} abgelaufene Anfragen, ${result.connectionLost} Verbindungsabbrüche.` };

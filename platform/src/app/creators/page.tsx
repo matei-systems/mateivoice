@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SearchX } from "lucide-react";
 import { searchCreators, searchParamsSchema } from "@/server/creators/service";
+import { listCategories } from "@/server/settings/service";
 import { CreatorCard } from "@/components/creators/creator-card";
 import { CreatorFilters, buildCreatorsHref } from "@/components/creators/creator-filters";
 import { ButtonLink } from "@/components/ui/button";
@@ -16,7 +17,8 @@ export default async function CreatorsPage({ searchParams }: PageProps<"/creator
   const raw = await searchParams;
   const flat = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value]));
   const params = searchParamsSchema.parse(flat);
-  const result = await searchCreators(params);
+  const [result, categories] = await Promise.all([searchCreators(params), listCategories()]);
+  const tagLabels = Object.fromEntries(categories.map((c) => [c.slug, c.label]));
   const isLive = params.availability === "live";
 
   return (
@@ -30,12 +32,12 @@ export default async function CreatorsPage({ searchParams }: PageProps<"/creator
             : "Filtere nach Verfügbarkeit, Sprache und Thema. Preise für private Chats sind pro Minute angegeben."
         }
       />
-      <CreatorFilters params={params} total={result.total} />
+      <CreatorFilters params={params} total={result.total} categories={categories} />
       {result.items.length > 0 ? (
         <>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {result.items.map((creator, index) => (
-              <CreatorCard key={creator.id} creator={creator} index={index} priority={index < 4} />
+              <CreatorCard key={creator.id} creator={creator} index={index} priority={index < 4} tagLabels={tagLabels} />
             ))}
           </div>
           <Pagination page={result.page} pageCount={result.pageCount} hrefFor={(page) => buildCreatorsHref(params, { page })} />

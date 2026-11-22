@@ -5,12 +5,70 @@ import { ROLE_LABELS } from "@/server/auth/permissions";
 
 export const transactionKindLabel: Record<string, string> = {
   test_credit: "Testguthaben erstellt",
-  purchase: "Kauf (simuliert)",
+  purchase: "Münzkauf",
   session_charge: "Privater Chat",
-  refund: "Rückerstattung",
+  refund: "Erstattung",
   chargeback: "Rückbuchung",
-  payout: "Auszahlung",
+  payout: "Auszahlung (Reservierung)",
+  payout_settlement: "Auszahlung ausgeführt",
   adjustment: "Korrektur",
+  tip: "Trinkgeld",
+};
+
+export const payoutStatus: Record<string, { label: string; tone: BadgeTone }> = {
+  requested: { label: "Beantragt", tone: "warning" },
+  approved: { label: "Freigegeben", tone: "info" },
+  processing: { label: "In Ausführung", tone: "info" },
+  pending: { label: "Ausstehend", tone: "warning" },
+  completed: { label: "Ausgeführt", tone: "success" },
+  rejected: { label: "Abgelehnt", tone: "danger" },
+  failed: { label: "Fehlgeschlagen", tone: "danger" },
+  cancelled: { label: "Zurückgezogen", tone: "neutral" },
+};
+
+export const riskSeverityLabel: Record<string, { label: string; tone: BadgeTone }> = {
+  high: { label: "Hoch", tone: "danger" },
+  medium: { label: "Mittel", tone: "warning" },
+  low: { label: "Niedrig", tone: "neutral" },
+};
+
+export const riskStatusLabel: Record<string, { label: string; tone: BadgeTone }> = {
+  open: { label: "Offen", tone: "warning" },
+  reviewed: { label: "Geprüft", tone: "success" },
+  dismissed: { label: "Verworfen", tone: "neutral" },
+};
+
+export const privacyKindLabel: Record<string, string> = {
+  export: "Auskunft/Export",
+  deletion: "Löschung",
+  rectification: "Berichtigung",
+  objection: "Widerspruch",
+};
+
+export const privacyStatusLabel: Record<string, { label: string; tone: BadgeTone }> = {
+  received: { label: "Eingegangen", tone: "warning" },
+  completed: { label: "Erledigt", tone: "success" },
+  rejected: { label: "Abgelehnt", tone: "neutral" },
+  on_hold: { label: "Zurückgestellt", tone: "info" },
+};
+
+export const holdTargetLabel: Record<string, string> = {
+  user: "Konto",
+  media: "Bild",
+  video_session: "Sitzung",
+  chat_message: "Chatnachricht",
+  report: "Meldung",
+};
+
+export const moderationActionLabel: Record<string, string> = {
+  content_removed: "Inhalt entfernt",
+  profile_hidden: "Profil ausgeblendet",
+  account_suspended: "Konto gesperrt",
+  warning: "Verwarnung",
+  message_deleted: "Nachricht gelöscht",
+  user_muted: "Stummgeschaltet",
+  stream_terminated: "Sitzung beendet",
+  restriction_lifted: "Maßnahme aufgehoben",
 };
 
 export const sessionStatus: Record<string, { label: string; tone: BadgeTone }> = {

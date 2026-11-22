@@ -7,6 +7,8 @@ import { requireSession, toActor } from "@/server/auth/current";
 import { splitCommission, formatBps } from "@/server/ledger/commission";
 import { getSessionView } from "@/server/video/service";
 import { ReportDialog } from "@/components/moderation/report-dialog";
+import { ChatPanel } from "@/components/chat/chat-panel";
+import { getSettings } from "@/server/settings/service";
 import { SessionRoom } from "@/components/sessions/session-room";
 import { ActionForm } from "@/components/ui/action-form";
 import { Alert } from "@/components/ui/alert";
@@ -20,7 +22,7 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
   const { id } = await params;
   const session = await requireSession(`/sessions/${id}`);
   const actor = toActor(session)!;
-  const view = await getSessionView(actor, id);
+  const [view, settings] = await Promise.all([getSessionView(actor, id), getSettings()]);
   if (!view) notFound();
 
   const counterpartName = view.viewerRole === "creator" ? (view.customerName ?? "Kunde") : view.creator.displayName;
@@ -59,6 +61,16 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
         }}
       />
 
+      {view.viewerRole !== "staff" && (view.status === "active" || view.status === "ended") ? (
+        <ChatPanel
+          sessionId={view.id}
+          viewerId={actor.id}
+          title="Chat (nur ihr beide)"
+          tip={view.viewerRole === "customer" && view.status === "active" ? { min: settings.pricing.tipMin, max: settings.pricing.tipMax, enabled: settings.featureFlags.tips, currencyLabel: view.currency === "TEST_COIN" ? "Testmünzen" : "Münzen" } : null}
+          className="max-h-[32rem]"
+        />
+      ) : null}
+
       {view.viewerRole === "customer" && (view.status === "requested" || view.status === "accepted") ? (
         <ActionForm action={cancelRequestAction} submitLabel="Anfrage stornieren" submitVariant="outline" submitSize="sm">
           <input type="hidden" name="sessionId" value={view.id} />
@@ -90,7 +102,7 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
       <Alert tone="info" title="So wird abgerechnet">
         <span>
           Sobald beide Seiten verbunden sind, wird jede begonnene Minute serverseitig zum fixierten Preis berechnet – jede Minute genau einmal.
-          Bei Verbindungsverlust (über 45 Sekunden ohne Signal) endet die Sitzung automatisch. Es handelt sich ausschließlich um Testmünzen.
+          Bei Verbindungsverlust (über {settings.streaming.heartbeatTimeoutSeconds} Sekunden ohne Signal) endet die Sitzung automatisch.{view.currency === "TEST_COIN" ? " Es handelt sich ausschließlich um Testmünzen." : ""}
         </span>
       </Alert>
     </div>

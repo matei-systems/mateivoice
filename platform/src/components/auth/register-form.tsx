@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Sparkles, UserRound } from "lucide-react";
 import { useActionState, useState } from "react";
 import { registerAction } from "@/actions/auth";
-import { Checkbox, Field, FormMessage, Honeypot, Input } from "@/components/ui/form";
+import { Checkbox, Field, FormMessage, Honeypot, Input, Select } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { idleState } from "@/lib/action-state";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,9 @@ const ROLES = [
   { value: "creator", title: "Creator", text: "Eigenes Profil, eigene Preise, Live gehen", icon: Sparkles },
 ] as const;
 
-export function RegisterForm({ initialRole }: { initialRole: "customer" | "creator" }) {
+const COUNTRY_NAMES: Record<string, string> = { AT: "Österreich", DE: "Deutschland", CH: "Schweiz", LI: "Liechtenstein" };
+
+export function RegisterForm({ initialRole, countries }: { initialRole: "customer" | "creator"; countries: string[] }) {
   const [state, action] = useActionState(registerAction, idleState);
   const [role, setRole] = useState<"customer" | "creator">(initialRole);
   return (
@@ -52,10 +54,22 @@ export function RegisterForm({ initialRole }: { initialRole: "customer" | "creat
       <Field id="username" label="Nutzername" hint="3–24 Zeichen. Wird anderen angezeigt – bitte keinen Klarnamen verwenden.">
         <Input id="username" name="username" autoComplete="username" required minLength={3} maxLength={24} pattern="[A-Za-z0-9_.\-]{3,24}" />
       </Field>
+      <Field id="country" label="Wohnsitzland" hint="Die Plattform ist derzeit nur in diesen Ländern verfügbar. Bestimmt die Anforderungen an die Altersprüfung.">
+        <Select id="country" name="country" required defaultValue="">
+          <option value="" disabled>
+            Bitte wählen …
+          </option>
+          {countries.map((code) => (
+            <option key={code} value={code}>
+              {COUNTRY_NAMES[code] ?? code}
+            </option>
+          ))}
+        </Select>
+      </Field>
       <Field id="password" label="Passwort" hint="Mindestens 12 Zeichen. Eine Passphrase aus mehreren Wörtern ist ideal.">
         <Input id="password" name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} />
       </Field>
-      <div className="space-y-3 rounded-xl bg-brand-25 p-4 ring-1 ring-inset ring-line">
+      <div className="space-y-3 rounded-xl bg-surface-2 p-4 ring-1 ring-inset ring-line">
         <Checkbox id="confirmAdult" name="confirmAdult" required>
           Ich bin mindestens <strong>18 Jahre</strong> alt.
         </Checkbox>

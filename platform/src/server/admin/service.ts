@@ -1,6 +1,6 @@
 import "server-only";
 import { getSettings } from "@/server/settings/service";
-import { and, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { getEnv } from "@/config/env";
 import { commission, pricing, testCoins, uploads, videoSessions as videoConfig } from "@/config/platform";
 import { getDb } from "@/server/db/client";
@@ -17,7 +17,7 @@ import {
 import { writeAuditLog } from "@/server/audit";
 import { notFound } from "@/server/errors";
 import type { Role } from "@/server/auth/permissions";
-import { getEmailAdapter } from "@/server/notifications/email";
+import { emailProviderInfo } from "@/server/email/service";
 import { getPaymentProvider } from "@/server/payments/provider";
 import { payoutAvailability } from "@/server/payouts/service";
 import { getVideoProvider } from "@/server/video/provider";
@@ -66,6 +66,33 @@ export async function getDashboardStats() {
   const [ticketStats] = await db
     .select({ open: sql<number>`count(*) FILTER (WHERE ${supportTickets.status} IN ('open', 'waiting_for_user'))::int` })
     .from(supportTickets);
+  // Aktuelle Zuschauer: Teilnehmer aktiver Sitzungen mit Herzschlag in den letzten 2 Minuten.
+  const viewers = await db.execute<{ viewers: number; streams: number }>(sql`
+    SELECT count(DISTINCT p.user_id) FILTER (WHERE p.role <> 'creator')::int AS viewers,
+           count(DISTINCT s.id) FILTER (WHERE s.kind = 'public_stream')::int AS streams
+      FROM video_sessions s
+      LEFT JOIN video_session_participants p ON p.session_id = s.id AND p.left_at IS NULL AND p.last_heartbeat_at > now() - interval '2 minutes'
+     WHERE s.status = 'active'`);
+  const extra = await db.execute<{
+    open_payouts: number;
+    open_risk: number;
+    high_risk: number;
+    orders_today_cents: number;
+    orders_today: number;
+    registrations_today: number;
+    privacy_open: number;
+    active_holds: number;
+  }>(sql`
+    SELECT
+      (SELECT count(*) FROM payouts WHERE status IN ('requested', 'approved'))::int AS open_payouts,
+      (SELECT count(*) FROM risk_events WHERE status = 'open')::int AS open_risk,
+      (SELECT count(*) FROM risk_events WHERE status = 'open' AND severity = 'high')::int AS high_risk,
+      (SELECT coalesce(sum(price_cents), 0) FROM payment_orders WHERE status = 'confirmed' AND updated_at >= date_trunc('day', now()))::int AS orders_today_cents,
+      (SELECT count(*) FROM payment_orders WHERE status = 'confirmed' AND updated_at >= date_trunc('day', now()))::int AS orders_today,
+      (SELECT count(*) FROM users WHERE created_at >= date_trunc('day', now()) AND role IN ('customer', 'creator'))::int AS registrations_today,
+      (SELECT count(*) FROM privacy_requests WHERE status IN ('received', 'on_hold'))::int AS privacy_open,
+      (SELECT count(*) FROM legal_holds WHERE released_at IS NULL)::int AS active_holds`);
+  const e = extra.rows[0];
   return {
     users: userStats!,
     creators: creatorStats!,
@@ -78,6 +105,11 @@ export async function getDashboardStats() {
       issued: Number(ledgerStats?.issued ?? 0),
     },
     tickets: ticketStats!,
+    live: { viewers: Number(viewers.rows[0]?.viewers ?? 0), streams: Number(viewers.rows[0]?.streams ?? 0) },
+    finance: { openPayouts: Number(e?.open_payouts ?? 0), ordersToday: Number(e?.orders_today ?? 0), ordersTodayCents: Number(e?.orders_today_cents ?? 0) },
+    risk: { open: Number(e?.open_risk ?? 0), high: Number(e?.high_risk ?? 0) },
+    compliance: { privacyOpen: Number(e?.privacy_open ?? 0), activeHolds: Number(e?.active_holds ?? 0) },
+    registrationsToday: Number(e?.registrations_today ?? 0),
   };
 }
 
@@ -208,8 +240,8 @@ export async function getConfigOverview() {
     testMode: env.TEST_MODE,
     appUrl: env.APP_URL,
     providers: {
-      email: { name: getEmailAdapter().name, real: getEmailAdapter().deliversRealEmail },
-      payment: { name: getPaymentProvider()?.name ?? "keiner", real: getPaymentProvider()?.isReal ?? false },
+      email: { name: emailProviderInfo().name, real: emailProviderInfo().deliversRealEmail },
+      payment: { name: getPaymentProvider()?.name ?? "keiner", real: getPaymentProvider()?.movesRealMoney ?? false },
       payout: { name: env.PAYOUT_PROVIDER, real: false, note: payoutAvailability().reason },
       video: { name: getVideoProvider()?.name ?? "keiner", real: getVideoProvider()?.isReal ?? false },
       identity: { name: getIdentityProvider()?.name ?? "keiner", real: getIdentityProvider()?.isReal ?? false },
@@ -221,4 +253,29 @@ export async function getConfigOverview() {
     videoSessions: videoConfig,
     uploads: { maxBytes: uploads.maxBytes, allowedMimeTypes: uploads.allowedMimeTypes, maxGalleryImages: uploads.maxGalleryImages },
   };
+}
+
+
+/** Offene und laufende Sitzungen für die Moderation (nur Metadaten, keine Inhalte). */
+export async function listOpenSessionsForStaff() {
+  const viewerCount = sql<number>`(SELECT count(*)::int FROM video_session_participants p WHERE p.session_id = ${videoSessions.id} AND p.left_at IS NULL AND p.role <> 'creator' AND p.last_heartbeat_at > now() - interval '2 minutes')`;
+  return getDb()
+    .select({
+      id: videoSessions.id,
+      kind: videoSessions.kind,
+      status: videoSessions.status,
+      startedAt: videoSessions.startedAt,
+      requestedAt: videoSessions.requestedAt,
+      provider: videoSessions.provider,
+      displayName: creatorProfiles.displayName,
+      slug: creatorProfiles.slug,
+      creatorUsername: users.username,
+      viewers: viewerCount,
+    })
+    .from(videoSessions)
+    .innerJoin(creatorProfiles, eq(creatorProfiles.id, videoSessions.creatorProfileId))
+    .innerJoin(users, eq(users.id, videoSessions.creatorUserId))
+    .where(inArray(videoSessions.status, ["requested", "accepted", "active"]))
+    .orderBy(desc(videoSessions.requestedAt))
+    .limit(200);
 }

@@ -1,10 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { getDb } from "@/server/db/client";
-import { coinPackages, creatorProfiles, notifications, paymentOrders, users } from "@/server/db/schema";
-import { buildSimulatedEvent, createSimulatedOrder, handlePaymentWebhook } from "@/server/payments/service";
-import { getBalance, grantTestCoins, reconcileLedger } from "@/server/ledger/service";
-import { requestPayout } from "@/server/payouts/service";
+import { creatorProfiles, notifications, users } from "@/server/db/schema";
+import { grantTestCoins } from "@/server/ledger/service";
 import {
   createAppeal,
   createReport,
@@ -18,79 +16,6 @@ import { requestPrivateSession, respondToRequest } from "@/server/video/service"
 import { validateSessionToken } from "@/server/auth/session";
 import { actorOf, createCreator, createSessionFor, createUser } from "../support/db-helpers";
 
-async function examplePackage() {
-  const [pkg] = await getDb()
-    .insert(coinPackages)
-    .values({ code: `pkg-${Math.random()}`, name: "Beispiel 500", coins: 500, priceCents: 999, currency: "EUR" })
-    .returning();
-  return pkg!;
-}
-
-describe("Simulierter Zahlungsfluss", () => {
-  it("Bestätigung schreibt Testmünzen einmalig gut – auch bei doppeltem Webhook", async () => {
-    const admin = await createUser({ role: "admin" });
-    const customer = await createUser();
-    const pkg = await examplePackage();
-    const order = await createSimulatedOrder({ adminUserId: admin.id, customerUserId: customer.id, packageId: pkg.id });
-    expect(order.status).toBe("pending");
-    expect(order.simulated).toBe(true);
-
-    const { rawBody, signature } = buildSimulatedEvent(order, "payment.confirmed");
-    expect(await handlePaymentWebhook(rawBody, signature)).toBe("processed");
-    expect(await handlePaymentWebhook(rawBody, signature)).toBe("duplicate");
-    // Neues Ereignis gleichen Typs für bereits bestätigte Bestellung → ignoriert
-    const second = buildSimulatedEvent(order, "payment.confirmed");
-    expect(await handlePaymentWebhook(second.rawBody, second.signature)).toBe("ignored");
-
-    expect(await getBalance(customer.id, "customer_wallet", "TEST_COIN")).toBe(500);
-    expect(await getBalance(customer.id, "customer_wallet", "COIN")).toBe(0);
-    const [stored] = await getDb().select().from(paymentOrders).where(eq(paymentOrders.id, order.id));
-    expect(stored?.status).toBe("confirmed");
-  });
-
-  it("parallele identische Webhooks erzeugen genau eine Gutschrift", async () => {
-    const admin = await createUser({ role: "admin" });
-    const customer = await createUser();
-    const order = await createSimulatedOrder({ adminUserId: admin.id, customerUserId: customer.id, packageId: (await examplePackage()).id });
-    const { rawBody, signature } = buildSimulatedEvent(order, "payment.confirmed");
-    const results = await Promise.all(Array.from({ length: 6 }, () => handlePaymentWebhook(rawBody, signature)));
-    expect(results.filter((r) => r === "processed")).toHaveLength(1);
-    expect(await getBalance(customer.id, "customer_wallet")).toBe(500);
-  });
-
-  it("lehnt unsignierte oder manipulierte Webhooks ab", async () => {
-    const admin = await createUser({ role: "admin" });
-    const customer = await createUser();
-    const order = await createSimulatedOrder({ adminUserId: admin.id, customerUserId: customer.id, packageId: (await examplePackage()).id });
-    const { rawBody, signature } = buildSimulatedEvent(order, "payment.confirmed");
-    expect(await handlePaymentWebhook(rawBody, null)).toBe("invalid");
-    expect(await handlePaymentWebhook(rawBody.replace("payment.confirmed", "payment.failed"), signature)).toBe("invalid");
-    expect(await getBalance(customer.id, "customer_wallet")).toBe(0);
-  });
-
-  it("fehlgeschlagene Zahlung schreibt nichts gut; Rückbuchung macht Gutschrift rückgängig", async () => {
-    const admin = await createUser({ role: "admin" });
-    const customer = await createUser();
-    const pkg = await examplePackage();
-    const failed = await createSimulatedOrder({ adminUserId: admin.id, customerUserId: customer.id, packageId: pkg.id });
-    const failEvent = buildSimulatedEvent(failed, "payment.failed", "Karte abgelehnt (simuliert)");
-    await handlePaymentWebhook(failEvent.rawBody, failEvent.signature);
-    expect(await getBalance(customer.id, "customer_wallet")).toBe(0);
-
-    const ok = await createSimulatedOrder({ adminUserId: admin.id, customerUserId: customer.id, packageId: pkg.id });
-    const confirm = buildSimulatedEvent(ok, "payment.confirmed");
-    await handlePaymentWebhook(confirm.rawBody, confirm.signature);
-    const chargeback = buildSimulatedEvent(ok, "payment.charged_back");
-    await handlePaymentWebhook(chargeback.rawBody, chargeback.signature);
-    expect(await getBalance(customer.id, "customer_wallet")).toBe(0);
-    expect((await reconcileLedger()).ok).toBe(true);
-  });
-
-  it("Auszahlungen sind nicht verfügbar", async () => {
-    const creator = await createUser({ role: "creator" });
-    await expect(requestPayout(creator.id, 100)).rejects.toMatchObject({ code: "feature_unavailable" });
-  });
-});
 
 describe("Moderation", () => {
   it("Meldung zu möglichen Minderjährigen ist kritisch und benachrichtigt Admins", async () => {

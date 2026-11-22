@@ -47,6 +47,7 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
         username: formString(formData, "username"),
         password: formString(formData, "password"),
         role: formString(formData, "role"),
+        country: formString(formData, "country"),
         confirmAdult: formData.get("confirmAdult") ?? undefined,
         acceptTerms: formData.get("acceptTerms") ?? undefined,
         acceptPrivacy: formData.get("acceptPrivacy") ?? undefined,

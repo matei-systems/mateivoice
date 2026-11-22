@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export const PRIMARY_NAV = [
   { href: "/creators", label: "Entdecken" },
   { href: "/creators?availability=live", label: "Live" },
-  { href: "/how-it-works", label: "So funktioniert's" },
+  { href: "/pricing", label: "Preise" },
   { href: "/safety", label: "Sicherheit" },
   { href: "/for-creators", label: "Für Creator" },
 ] as const;

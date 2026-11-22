@@ -1,4 +1,5 @@
-import { index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { emailOutboxStatus } from "./enums";
 import { users } from "./users";
 
@@ -29,16 +30,28 @@ export const emailOutbox = pgTable(
   "email_outbox",
   {
     id: uuid().primaryKey().defaultRandom(),
+    userId: uuid().references(() => users.id, { onDelete: "set null" }),
     toAddress: text().notNull(),
     template: text().notNull(),
+    /** transactional | security | session_updates | marketing */
+    category: text().notNull().default("transactional"),
     subject: text().notNull(),
-    /** Nur im Entwicklungsmodus befüllt. */
+    /** Inhalt nur bis zum Versand bzw. im Entwicklungsmodus gespeichert (Datensparsamkeit). */
     bodyText: text(),
+    bodyHtml: text(),
     status: emailOutboxStatus().notNull(),
+    attempts: integer().notNull().default(0),
+    nextAttemptAt: timestamp({ withTimezone: true }),
+    lastError: text(),
+    providerMessageId: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     sentAt: timestamp({ withTimezone: true }),
   },
-  (t) => [index("email_outbox_created_idx").on(t.createdAt)],
+  (t) => [
+    index("email_outbox_created_idx").on(t.createdAt),
+    index("email_outbox_queue_idx").on(t.status, t.nextAttemptAt),
+    check("email_outbox_category", sql`${t.category} IN ('transactional', 'security', 'session_updates', 'marketing')`),
+  ],
 );
 
 /** Datenbankbasierte Rate-Limits (keine zusätzliche Infrastruktur wie Redis nötig). */

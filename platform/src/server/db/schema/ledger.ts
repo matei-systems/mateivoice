@@ -211,6 +211,13 @@ export const payouts = pgTable(
     failureReason: text(),
     /** Buchung der Reservierung (Creator-Konto → Auszahlungs-Verrechnungskonto). */
     ledgerTransactionId: uuid().references(() => ledgerTransactions.id, { onDelete: "restrict" }),
+    /** Buchung der Ausführung (Verrechnungskonto → ausgezahlt) bzw. der Freigabe der Reservierung. */
+    settlementTransactionId: uuid().references(() => ledgerTransactions.id, { onDelete: "restrict" }),
+    /** Euro-Gegenwert zum Antragszeitpunkt (Snapshot des Auszahlungswerts). */
+    fiatAmountCents: integer(),
+    fiatCurrency: text().notNull().default("EUR"),
+    centsPer100Coins: integer(),
+    processedById: uuid().references(() => users.id, { onDelete: "restrict" }),
     simulated: boolean().notNull().default(false),
     idempotencyKey: text(),
     /** Maskiertes Ziel (z. B. „AT** … 1234“) – Bankdaten liegen verschlüsselt im Auszahlungsprofil. */

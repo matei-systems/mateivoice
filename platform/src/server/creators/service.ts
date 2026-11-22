@@ -186,6 +186,53 @@ export async function searchCreators(params: CreatorSearchParams) {
   return { items, total, page, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
+/** Öffentlich sichtbare Profile zu einer ID-Liste (Reihenfolge der Eingabe), z. B. für Favoriten. */
+export async function listPublicCreatorsByIds(ids: string[]): Promise<CreatorCardData[]> {
+  const valid = ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id)).slice(0, 200);
+  if (valid.length === 0) return [];
+  const rows = await getDb()
+    .select({
+      id: creatorProfiles.id,
+      slug: creatorProfiles.slug,
+      displayName: creatorProfiles.displayName,
+      tagline: creatorProfiles.tagline,
+      availability: creatorProfiles.availability,
+      languages: creatorProfiles.languages,
+      tags: creatorProfiles.tags,
+      coinsPerMinute: creatorOffers.coinsPerMinute,
+      privateChatEnabled: creatorOffers.enabled,
+      avatarMediaId: sql<string | null>`CASE WHEN ${mediaAssets.moderationStatus} = 'approved' AND ${mediaAssets.deletedAt} IS NULL THEN ${mediaAssets.id} ELSE NULL END`,
+      isTestProfile: creatorProfiles.isTestProfile,
+      verificationStatus: latestVerification,
+      verificationProvider: latestVerificationProvider,
+    })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .leftJoin(creatorOffers, and(eq(creatorOffers.creatorProfileId, creatorProfiles.id), eq(creatorOffers.kind, "private_chat")))
+    .leftJoin(mediaAssets, eq(mediaAssets.id, creatorProfiles.avatarMediaId))
+    .where(and(...publicVisibilityConditions(), inArray(creatorProfiles.id, valid)));
+  const byId = new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        id: row.id,
+        slug: row.slug,
+        displayName: row.displayName,
+        tagline: row.tagline,
+        availability: row.availability,
+        languages: row.languages,
+        tags: row.tags,
+        coinsPerMinute: row.coinsPerMinute,
+        privateChatEnabled: row.privateChatEnabled ?? false,
+        avatarMediaId: row.avatarMediaId,
+        isTestProfile: row.isTestProfile,
+        verification: verificationDisplay(row.verificationStatus as VerificationStatus | null, row.verificationProvider),
+      } satisfies CreatorCardData,
+    ]),
+  );
+  return valid.map((id) => byId.get(id)).filter((c): c is CreatorCardData => !!c);
+}
+
 export async function countPublicCreators() {
   const [row] = await getDb()
     .select({

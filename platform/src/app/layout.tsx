@@ -13,6 +13,9 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { TestModeBanner } from "@/components/layout/test-mode-banner";
 import { ToastProvider } from "@/components/ui/toast";
+import { MaintenanceScreen } from "@/components/layout/maintenance-screen";
+import { getSettings } from "@/server/settings/service";
+import { isStaffRole } from "@/server/auth/permissions";
 import "./globals.css";
 
 const inter = localFont({
@@ -44,25 +47,34 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fffbfc",
+  themeColor: "#0c090e",
+  colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
 };
 
 /** Seiten, die ohne Altershinweis erreichbar sein müssen (Rechtliches, Hilfe, E-Mail-Links). */
-const AGE_GATE_EXEMPT = ["/legal", "/safety", "/leave", "/support", "/verify-email", "/reset-password", "/forgot-password", "/login"];
+const AGE_GATE_EXEMPT = ["/legal", "/safety", "/leave", "/support", "/verify-email", "/reset-password", "/forgot-password", "/login", "/help", "/contact", "/unsubscribe", "/staff"];
 
 function isAgeGateExempt(pathname: string) {
   return AGE_GATE_EXEMPT.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+/** Im Wartungsmodus erreichbar: Anmeldung (für Mitarbeiter), Rechtliches, Mitarbeiterbereich. */
+const MAINTENANCE_EXEMPT = ["/login", "/legal", "/admin", "/staff", "/account/security"];
+
+function isMaintenanceExempt(pathname: string) {
+  return MAINTENANCE_EXEMPT.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const [cookieStore, headerList, session] = await Promise.all([cookies(), headers(), getCurrentSession()]);
+  const [cookieStore, headerList, session, settings] = await Promise.all([cookies(), headers(), getCurrentSession(), getSettings()]);
   const pathname = headerList.get("x-pathname") ?? "/";
   const user = session && !session.mfaPending ? session.user : null;
   const showAgeGate = !user && cookieStore.get(AGE_COOKIE)?.value !== "1" && !isAgeGateExempt(pathname);
   const unread = user ? await unreadNotificationCount(user.id) : 0;
+  const maintenance = settings.maintenance.enabled && !(user && isStaffRole(user.role)) && !isMaintenanceExempt(pathname);
 
   return (
     <html lang="de-AT" className={`${inter.variable} ${fraunces.variable}`} data-scroll-behavior="smooth">
@@ -78,7 +90,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <div className="flex min-h-dvh flex-col" inert={showAgeGate}>
             <SiteHeader />
             <main id="main" className="flex-1">
-              {children}
+              {maintenance ? <MaintenanceScreen message={settings.maintenance.message} /> : children}
             </main>
             <SiteFooter />
             <Suspense>

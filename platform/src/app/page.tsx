@@ -14,12 +14,12 @@ import {
   UserRoundCheck,
   Wallet,
 } from "lucide-react";
-import { TAGS } from "@/config/catalog";
 import { brand, videoSessions } from "@/config/platform";
 import { isTestMode } from "@/config/env";
 import { countPublicCreators, searchCreators } from "@/server/creators/service";
 import { formatBps } from "@/server/ledger/commission";
 import { currentCommissionBps } from "@/server/ledger/service";
+import { listCategories } from "@/server/settings/service";
 import { CreatorCard } from "@/components/creators/creator-card";
 import { ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/form";
@@ -41,7 +41,7 @@ const steps = [
   {
     icon: Wallet,
     title: "Münzen nutzen",
-    text: "Bezahlt wird mit Münzen – transparent pro Minute. Im aktuellen Testmodus gibt es nur kostenloses Testguthaben ohne Geldwert.",
+    text: "Bezahlt wird mit Münzen – Einmalkauf ohne Abo, transparent pro Minute. Im Testbetrieb laufen Käufe über eine Sandbox ohne echtes Geld.",
   },
   {
     icon: Radio,
@@ -54,12 +54,12 @@ const safety = [
   {
     icon: ShieldCheck,
     title: "Nur für Erwachsene",
-    text: "Kundinnen und Kunden bestätigen ihre Volljährigkeit. Creator werden im Echtbetrieb erst nach einer Alters- und Identitätsprüfung durch einen spezialisierten Anbieter freigeschaltet (Anbieter in Auswahl).",
+    text: "Live-Streams, Chat und Käufe erst nach Altersprüfung. Creator werden erst nach Alters- und Identitätsprüfung, Einwilligungserklärungen und manueller Freigabe veröffentlicht. Prüfanbieter in Auswahl – im Testbetrieb simuliert.",
   },
   {
     icon: Flag,
     title: "Melden mit Priorität",
-    text: "Jedes Profil und jede Sitzung kann gemeldet werden. Hinweise auf Minderjährige oder nicht einvernehmliche Inhalte werden sofort mit höchster Priorität geprüft.",
+    text: "Profile, Streams und Chatnachrichten können gemeldet werden. Hinweise auf Minderjährige oder nicht einvernehmliche Inhalte werden sofort priorisiert und Beweise automatisch gesichert.",
   },
   {
     icon: Lock,
@@ -83,18 +83,22 @@ const safety = [
   },
 ];
 
-const faqItems = (platformBps: number) => [
-  {
-    q: "Ist die Plattform schon in Betrieb?",
-    a: "Nein. Dies ist ein Prototyp im Testmodus. Es gibt keine echten Zahlungen, keine echten Streams und keine echten Creator. Alle Profile sind fiktive Testdaten.",
-  },
+const faqItems = (platformBps: number, testMode: boolean) => [
+  ...(testMode
+    ? [
+        {
+          q: "Ist die Plattform schon in Betrieb?",
+          a: "Nein. Die Plattform läuft im Testbetrieb: Käufe nur über eine Sandbox ohne echtes Geld, keine echten Streams und keine echten Creator. Alle Profile sind fiktive Testdaten.",
+        },
+      ]
+    : []),
   {
     q: "Was kosten private Chats?",
     a: "Creator legen ihren Minutenpreis innerhalb fester Grenzen selbst fest. Der Preis wird vor der Anfrage angezeigt und für die Dauer des Chats fixiert.",
   },
   {
     q: "Wie werden Creator geprüft?",
-    a: "Vor der Freischaltung durchlaufen Creator eine Alters- und Identitätsprüfung durch einen spezialisierten Anbieter. Der Anbieter wird derzeit ausgewählt – bis dahin ist kein Profil als „verifiziert“ gekennzeichnet.",
+    a: "Vor der Veröffentlichung braucht jedes Profil eine Alters- und Identitätsprüfung durch einen spezialisierten Anbieter, vollständige Einwilligungs- und Rechteerklärungen und eine manuelle Freigabe. Der Prüfanbieter wird derzeit ausgewählt – bis dahin ist kein Profil als „verifiziert“ gekennzeichnet.",
   },
   {
     q: "Werden meine Chats aufgezeichnet?",
@@ -107,13 +111,15 @@ const faqItems = (platformBps: number) => [
 ];
 
 export default async function HomePage() {
-  const [counts, live, featured, platformBps] = await Promise.all([
+  const [counts, live, featured, platformBps, categories] = await Promise.all([
     countPublicCreators(),
     searchCreators({ availability: "live", page: 1 }),
     searchCreators({ sort: "recommended", page: 1 }),
     currentCommissionBps(),
+    listCategories(),
   ]);
-  const faqs = faqItems(platformBps);
+  const tagLabels = Object.fromEntries(categories.map((c) => [c.slug, c.label]));
+  const faqs = faqItems(platformBps, isTestMode());
   const heroCreators = (live.items.length ? live.items : featured.items).slice(0, 3);
   const testMode = isTestMode();
 
@@ -121,12 +127,12 @@ export default async function HomePage() {
     <>
       {/* Hero */}
       <section className="relative overflow-hidden bg-aurora">
-        <div className="pointer-events-none absolute -top-24 right-[-10%] size-[34rem] rounded-full bg-brand-200/50 blur-3xl animate-float" aria-hidden="true" />
+        <div className="pointer-events-none absolute -top-24 right-[-10%] size-[34rem] rounded-full bg-brand-400/20 blur-3xl animate-float" aria-hidden="true" />
         <div className="relative mx-auto grid max-w-7xl gap-12 px-4 pt-14 pb-20 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:pt-20 lg:pb-28">
           <div className="animate-fade-up">
             <p className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-surface/80 px-3.5 py-1.5 text-xs font-semibold text-brand-700 shadow-xs backdrop-blur">
               <Sparkles className="size-3.5" aria-hidden="true" />
-              Live-Webcam-Plattform aus Österreich · 18+
+              Live-Webcam-Plattform für Österreich, Deutschland & Schweiz · 18+
             </p>
             <h1 className="mt-6 font-display text-[2.6rem] leading-[1.05] font-semibold tracking-tight text-ink-950 sm:text-6xl lg:text-[4.2rem]">
               Echte Begegnungen.
@@ -143,7 +149,7 @@ export default async function HomePage() {
                 <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-400" aria-hidden="true" />
                 <Input name="q" type="search" placeholder="Name oder Thema, z. B. Musik" className="h-12 border-transparent pl-10 shadow-none hover:border-transparent" maxLength={60} />
               </label>
-              <button type="submit" className="h-12 rounded-xl bg-brand-600 px-6 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700">
+              <button type="submit" className="h-12 rounded-xl bg-brand-600 px-6 text-sm font-semibold text-white shadow-soft transition hover:bg-action-hover">
                 Entdecken
               </button>
             </form>
@@ -179,7 +185,7 @@ export default async function HomePage() {
               return (
                 <div key={creator.id} className={`absolute w-52 ${position}`}>
                   <div
-                    className="animate-fade-up rounded-3xl border border-white/70 bg-surface p-2 shadow-lift"
+                    className="animate-fade-up rounded-3xl border border-line-strong bg-surface p-2 shadow-lift"
                     style={{ animationDelay: `${150 + index * 120}ms` }}
                   >
                     <div className="relative aspect-[4/5] overflow-hidden rounded-2xl">
@@ -237,7 +243,7 @@ export default async function HomePage() {
           {live.items.length > 0 ? (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {live.items.slice(0, 4).map((creator, index) => (
-                <CreatorCard key={creator.id} creator={creator} index={index} priority={index < 2} />
+                <CreatorCard key={creator.id} creator={creator} index={index} priority={index < 2} tagLabels={tagLabels} />
               ))}
             </div>
           ) : (
@@ -255,10 +261,10 @@ export default async function HomePage() {
       <section className="mx-auto max-w-7xl px-4 pt-24 sm:px-6">
         <SectionHeading eyebrow="Entdecken" title="Finde Creator, die zu dir passen" description="Nach Themen, Sprachen und Verfügbarkeit filtern – die Suche ist jederzeit erweiterbar." />
         <ul className="scrollbar-none -mx-4 mt-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-          {TAGS.map((tag) => (
-            <li key={tag.code} className="shrink-0">
+          {categories.map((tag) => (
+            <li key={tag.slug} className="shrink-0">
               <Link
-                href={`/creators?tag=${tag.code}`}
+                href={`/creators?tag=${tag.slug}`}
                 className="inline-flex rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink-700 shadow-xs transition hover:-translate-y-px hover:border-brand-300 hover:text-brand-700"
               >
                 {tag.label}
@@ -268,7 +274,7 @@ export default async function HomePage() {
         </ul>
         <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {featured.items.slice(0, 8).map((creator, index) => (
-            <CreatorCard key={creator.id} creator={creator} index={index} />
+            <CreatorCard key={creator.id} creator={creator} index={index} tagLabels={tagLabels} />
           ))}
         </div>
         <div className="mt-10 flex justify-center">
@@ -284,7 +290,7 @@ export default async function HomePage() {
         <ol className="mt-12 grid gap-5 md:grid-cols-3">
           {steps.map((step, index) => (
             <li key={step.title} className="relative rounded-3xl border border-line bg-surface p-7 shadow-card">
-              <span className="absolute top-6 right-7 font-display text-5xl font-semibold text-brand-100" aria-hidden="true">
+              <span className="absolute top-6 right-7 font-display text-5xl font-semibold text-brand-200" aria-hidden="true">
                 {index + 1}
               </span>
               <span className="grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-600">
@@ -298,7 +304,7 @@ export default async function HomePage() {
       </section>
 
       {/* Sicherheit */}
-      <section className="mt-28 bg-gradient-to-b from-brand-50/70 to-canvas py-24">
+      <section className="mt-28 bg-gradient-to-b from-brand-25 to-canvas py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
             <div className="lg:sticky lg:top-28">
@@ -322,23 +328,23 @@ export default async function HomePage() {
 
       {/* Creator-CTA */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="relative overflow-hidden rounded-[2.25rem] bg-ink-950 px-6 py-14 text-white sm:px-12 lg:py-16">
-          <div className="pointer-events-none absolute -top-24 -right-20 size-96 rounded-full bg-brand-500/40 blur-3xl" aria-hidden="true" />
-          <div className="pointer-events-none absolute -bottom-32 left-10 size-80 rounded-full bg-brand-300/20 blur-3xl" aria-hidden="true" />
+        <div className="relative overflow-hidden rounded-[2.25rem] border border-brand-300/40 bg-gradient-to-br from-brand-100 via-surface to-surface px-6 py-14 text-white sm:px-12 lg:py-16">
+          <div className="pointer-events-none absolute -top-24 -right-20 size-96 rounded-full bg-brand-500/30 blur-3xl" aria-hidden="true" />
+          <div className="pointer-events-none absolute -bottom-32 left-10 size-80 rounded-full bg-violet-500/15 blur-3xl" aria-hidden="true" />
           <div className="relative grid gap-8 lg:grid-cols-[1.3fr_1fr] lg:items-center">
             <div>
-              <p className="text-xs font-semibold tracking-[0.16em] text-brand-300 uppercase">Für Creator</p>
+              <p className="text-xs font-semibold tracking-[0.16em] text-brand-700 uppercase">Für Creator</p>
               <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">Deine Preise. Deine Regeln. Transparente Abrechnung.</h2>
-              <p className="mt-4 max-w-xl leading-relaxed text-white/75">
-                Lege deinen Minutenpreis selbst fest und sieh jede Abrechnung im Detail. Vorläufige Plattformprovision:{" "}
-                <strong className="text-white">{formatBps(platformBps)}</strong> – endgültige Bedingungen werden vertraglich geprüft.
+              <p className="mt-4 max-w-xl leading-relaxed text-ink-700">
+                Lege deinen Minutenpreis selbst fest und sieh jede Abrechnung im Detail. Dein Anteil:{" "}
+                <strong className="text-ink-950">{formatBps(10_000 - platformBps)}</strong> der für dich eingesetzten Münzen (vorläufige Regel, vertraglich zu bestätigen).
               </p>
             </div>
             <div className="flex flex-wrap gap-3 lg:justify-end">
               <ButtonLink href="/register?role=creator" size="lg" variant="inverse">
                 Creator-Konto erstellen
               </ButtonLink>
-              <ButtonLink href="/for-creators" size="lg" variant="ghostInverse">
+              <ButtonLink href="/for-creators" size="lg" variant="outline">
                 Mehr erfahren
               </ButtonLink>
             </div>

@@ -6,7 +6,8 @@ import { commission } from "@/config/platform";
 import { requireRole, toActor } from "@/server/auth/current";
 import { getOwnProfile } from "@/server/creators/service";
 import { formatBps } from "@/server/ledger/commission";
-import { currentCommissionBps, getBalance } from "@/server/ledger/service";
+import { activeCoinCurrency, currentCommissionBps, getBalance } from "@/server/ledger/service";
+import { declarationsComplete } from "@/server/compliance/declarations";
 import { getLatestVerification } from "@/server/verification/service";
 import { listOpenRequestsForCreator, listSessionsForUser } from "@/server/video/service";
 import { SessionsTable } from "@/components/account/sessions-table";
@@ -26,12 +27,14 @@ export const metadata: Metadata = { title: "Creator-Studio" };
 export default async function StudioOverviewPage() {
   const session = await requireRole(["creator"], "/studio");
   const actor = toActor(session)!;
-  const [own, earnings, verification, sessions, openRequests] = await Promise.all([
+  const [own, earnings, verification, sessions, openRequests, declarationsOk, bps] = await Promise.all([
     getOwnProfile(actor.id),
-    getBalance(actor.id, "creator_earnings"),
+    getBalance(actor.id, "creator_earnings", activeCoinCurrency()),
     getLatestVerification(actor.id),
     listSessionsForUser(actor, 5),
     listOpenRequestsForCreator(actor),
+    declarationsComplete(actor.id),
+    currentCommissionBps(),
   ]);
   if (!own) return <Alert tone="danger" title="Kein Creator-Profil gefunden">Bitte kontaktiere den Support.</Alert>;
   const { profile, offer, media } = own;
@@ -46,6 +49,7 @@ export default async function StudioOverviewPage() {
     { done: profile.reviewStatus !== "draft" && profile.reviewStatus !== "changes_requested", label: "Profil zur Prüfung eingereicht", href: "/studio/profile" },
     { done: profile.reviewStatus === "approved", label: "Profil freigegeben", href: "/studio/profile" },
     { done: canOperate, label: isTestMode() ? "Verifizierung (im Testmodus simuliert)" : "Alters- & Identitätsprüfung bestanden", href: "/studio/verification" },
+    { done: declarationsOk, label: "Einwilligungs- & Rechteerklärungen abgegeben", href: "/studio/declarations" },
     { done: !!offer?.enabled, label: "Privaten Chat aktiviert", href: "/studio/pricing" },
   ];
   const doneCount = checklist.filter((c) => c.done).length;
@@ -62,8 +66,8 @@ export default async function StudioOverviewPage() {
         <Alert tone="brand" title="Neue Anfrage für einen privaten Chat" action={<ButtonLink href="/studio/live" size="sm">Ansehen</ButtonLink>} />
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard tone="brand" label="Einnahmen (Testmünzen)" value={<CoinAmount amount={earnings} size="lg" />} hint="Simuliert – nicht auszahlbar." icon={<Coins className="size-5" aria-hidden="true" />} />
-        <StatCard label="Provision (vorläufig)" value={formatBps(await currentCommissionBps())} hint={commission.basisDescription} icon={<Percent className="size-5" aria-hidden="true" />} />
+        <StatCard tone="brand" label="Einnahmen" value={<CoinAmount amount={earnings} size="lg" test={isTestMode()} />} hint={isTestMode() ? "Testmünzen – Auszahlung nur simuliert." : undefined} icon={<Coins className="size-5" aria-hidden="true" />} />
+        <StatCard label="Dein Anteil" value={formatBps(10_000 - bps)} hint={`Plattformprovision ${formatBps(bps)} (vorläufig). ${commission.basisDescription}`} icon={<Percent className="size-5" aria-hidden="true" />} />
         <StatCard label="Profilstatus" value={<Badge tone={review.tone}>{review.label}</Badge>} hint={profile.reviewNote ? `Hinweis: ${profile.reviewNote}` : undefined} />
         <StatCard label="Verifizierung" value={<VerificationBadge verification={display} />} hint={display.description} icon={<Users className="size-5" aria-hidden="true" />} />
       </div>
@@ -76,7 +80,7 @@ export default async function StudioOverviewPage() {
           <ul className="grid gap-2 sm:grid-cols-2">
             {checklist.map((item) => (
               <li key={item.label}>
-                <Link href={item.href} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-brand-25", item.done ? "text-ink-600" : "font-medium text-ink-900")}>
+                <Link href={item.href} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-surface-2", item.done ? "text-ink-600" : "font-medium text-ink-900")}>
                   {item.done ? <CheckCircle2 className="size-5 text-success-600" aria-hidden="true" /> : <Circle className="size-5 text-ink-300" aria-hidden="true" />}
                   <span className={cn(item.done && "line-through decoration-ink-300")}>{item.label}</span>
                 </Link>

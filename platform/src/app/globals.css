@@ -1,13 +1,20 @@
 @import "tailwindcss";
 
 /*
- * Designsystem „Aurora“
+ * Designsystem „Aurora Noir“ (Premium Dark)
  * ---------------------------------------------------------------------------
  * Alle Farben, Radien, Schatten und Animationen sind hier als Tokens definiert.
  * Komponenten verwenden ausschließlich diese Tokens (z. B. bg-brand-600,
  * text-ink-700, shadow-card) – keine verstreuten Hex-Werte.
  *
- * Kontrast (WCAG 2.2 AA): brand-600 auf Weiß ≈ 5,0:1, ink-600 auf Weiß ≈ 6,1:1.
+ * Dunkles Farbschema: Die Skalen sind für dunkle Flächen ausgelegt.
+ *  - ink-950 … ink-600: Text (hell → gedämpft); ink-50 … ink-300: neutrale Flächen.
+ *  - brand-700 … brand-900: Pink als Text/Links auf Dunkel; brand-25 … brand-300:
+ *    getönte Flächen und Linien; brand-600: Aktionsfläche (weißer Text).
+ *  - Statusfarben: *-50/*-200 Flächen/Linien, *-600 Icons/Punkte, *-700 Text.
+ *
+ * Kontrast (WCAG 2.2 AA, auf surface #141017): ink-900 ≈ 15:1, ink-600 ≈ 6,9:1,
+ * brand-700 ≈ 7,8:1; Weiß auf brand-600 ≈ 5,3:1, auf action-hover ≈ 4,6:1.
  */
 
 @theme {
@@ -15,59 +22,71 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
 
-  /* Markenfarbe Pink – 600 ist die zugängliche Aktionsfarbe */
-  --color-brand-25: #fffafc;
-  --color-brand-50: #fff4f8;
-  --color-brand-100: #ffe8f0;
-  --color-brand-200: #ffd2e1;
-  --color-brand-300: #fcb0c9;
-  --color-brand-400: #f584aa;
-  --color-brand-500: #ea5a8d;
-  --color-brand-600: #cc2f6e;
-  --color-brand-700: #b0245c;
-  --color-brand-800: #8c1f4b;
-  --color-brand-900: #6a1b3b;
+  /* Markenfarbe Pink (für dunkle Flächen) */
+  --color-brand-25: #170d15;
+  --color-brand-50: #1f0f1b;
+  --color-brand-100: #2c1326;
+  --color-brand-200: #4a1838;
+  --color-brand-300: #73204f;
+  --color-brand-400: #b8336f;
+  --color-brand-500: #ec4f8f;
+  --color-brand-600: #c92a68;
+  --color-brand-700: #ff7fb2;
+  --color-brand-800: #ffa6cb;
+  --color-brand-900: #ffd1e4;
+  /* Tiefes Pink für Text auf hellen Flächen (z. B. Inverse-Buttons) */
+  --color-brand-deep: #a3205a;
+  /* Aktionsflächen */
+  --color-action-hover: #d82f72;
+  --color-violet-400: #a78bfa;
+  --color-violet-500: #8b5cf6;
 
   /* Text- und Neutraltöne mit leichtem Pflaumenstich */
-  --color-ink-950: #1e1220;
-  --color-ink-900: #2a1d2c;
-  --color-ink-800: #3d2f40;
-  --color-ink-700: #54465a;
-  --color-ink-600: #6b5e70;
-  --color-ink-500: #8a7f8e;
-  --color-ink-400: #b3aab6;
-  --color-ink-300: #d7d0d9;
-  --color-ink-200: #eae4eb;
-  --color-ink-100: #f5f1f5;
-  --color-ink-50: #faf8fa;
+  --color-ink-950: #f7f2f9;
+  --color-ink-900: #ebe4ef;
+  --color-ink-800: #d8cede;
+  --color-ink-700: #c1b5c9;
+  --color-ink-600: #a698b0;
+  --color-ink-500: #86798f;
+  --color-ink-400: #685b71;
+  --color-ink-300: #4b3f54;
+  --color-ink-200: #362c3d;
+  --color-ink-100: #271f2d;
+  --color-ink-50: #1b1520;
 
   /* Flächen & Linien */
-  --color-canvas: #fffbfc;
-  --color-surface: #ffffff;
-  --color-line: #f1e3ea;
-  --color-line-strong: #e5cfda;
+  --color-canvas: #0c090e;
+  --color-surface: #141017;
+  --color-surface-2: #1b161f;
+  --color-line: #2a2230;
+  --color-line-strong: #3b3043;
+  /* Immer dunkle Bühne (Video) und Abdunklung (Overlays) */
+  --color-stage: #050407;
+  --color-scrim: #000000;
 
   /* Semantische Statusfarben */
-  --color-success-50: #ecfdf3;
-  --color-success-200: #bbf7d0;
-  --color-success-600: #16a34a;
-  --color-success-700: #15803d;
-  --color-warning-50: #fff8eb;
-  --color-warning-200: #fde2b5;
-  --color-warning-600: #d97706;
-  --color-warning-700: #b45309;
-  --color-danger-50: #fff1f3;
-  --color-danger-200: #fecdd6;
-  --color-danger-600: #e11d48;
-  --color-danger-700: #be123c;
-  --color-info-50: #eff6ff;
-  --color-info-200: #bfdbfe;
-  --color-info-700: #1d4ed8;
+  --color-success-50: #0d1f16;
+  --color-success-200: #1d4a33;
+  --color-success-600: #34d17d;
+  --color-success-700: #6ee7a8;
+  --color-warning-50: #241a0a;
+  --color-warning-200: #5a4115;
+  --color-warning-600: #f59e0b;
+  --color-warning-700: #fcc35e;
+  --color-danger-50: #260c13;
+  --color-danger-200: #5b1727;
+  --color-danger-600: #ff4d6d;
+  --color-danger-700: #ff8a9f;
+  --color-danger-solid: #c81e45;
+  --color-danger-solid-hover: #d62a50;
+  --color-info-50: #0c1628;
+  --color-info-200: #1c3561;
+  --color-info-700: #93bbff;
   /* Testmodus – bewusst andere Farbwelt als die Marke */
-  --color-test-50: #f5f3ff;
-  --color-test-200: #ddd6fe;
-  --color-test-700: #6d28d9;
-  --color-live: #e11d48;
+  --color-test-50: #181130;
+  --color-test-200: #352a63;
+  --color-test-700: #c8b8ff;
+  --color-live: #ff3b5c;
 
   /* Radien */
   --radius-sm: 0.5rem;
@@ -77,12 +96,12 @@
   --radius-2xl: 1.75rem;
   --radius-3xl: 2.25rem;
 
-  /* Schatten – weich und leicht rosé getönt */
-  --shadow-xs: 0 1px 2px rgb(106 27 59 / 0.05);
-  --shadow-soft: 0 1px 2px rgb(106 27 59 / 0.04), 0 4px 14px rgb(106 27 59 / 0.06);
-  --shadow-card: 0 1px 2px rgb(106 27 59 / 0.04), 0 10px 30px -12px rgb(106 27 59 / 0.14);
-  --shadow-lift: 0 2px 4px rgb(106 27 59 / 0.05), 0 22px 44px -18px rgb(204 47 110 / 0.35);
-  --shadow-glow: 0 0 0 4px rgb(234 90 141 / 0.18);
+  /* Schatten – tief, mit dezentem Pink-Schimmer bei Hervorhebung */
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 18px rgb(0 0 0 / 0.35);
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 14px 34px -16px rgb(0 0 0 / 0.8);
+  --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.5), 0 24px 48px -20px rgb(236 79 143 / 0.45);
+  --shadow-glow: 0 0 0 4px rgb(236 79 143 / 0.3);
 
   /* Bewegung */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -145,7 +164,7 @@
 
 @layer base {
   :root {
-    color-scheme: light;
+    color-scheme: dark;
   }
 
   html {
@@ -189,8 +208,8 @@
   }
 
   dialog::backdrop {
-    background: rgb(30 18 32 / 0.42);
-    backdrop-filter: blur(4px);
+    background: rgb(0 0 0 / 0.66);
+    backdrop-filter: blur(6px);
   }
 }
 
@@ -198,21 +217,27 @@
   /* Dezenter Markenverlauf für Hero- und Akzentflächen */
   .bg-aurora {
     background:
-      radial-gradient(60rem 30rem at 85% -10%, rgb(255 210 225 / 0.85), transparent 60%),
-      radial-gradient(40rem 26rem at -10% 10%, rgb(255 232 240 / 0.9), transparent 60%),
-      radial-gradient(30rem 20rem at 60% 110%, rgb(252 176 201 / 0.35), transparent 60%),
+      radial-gradient(56rem 30rem at 88% -12%, rgb(201 42 104 / 0.34), transparent 62%),
+      radial-gradient(44rem 28rem at -12% 8%, rgb(139 92 246 / 0.16), transparent 60%),
+      radial-gradient(36rem 22rem at 55% 115%, rgb(236 79 143 / 0.14), transparent 60%),
       var(--color-canvas);
   }
 
+  /* Feine Glasfläche für schwebende Leisten */
+  .glass {
+    background: rgb(20 16 23 / 0.72);
+    backdrop-filter: saturate(140%) blur(14px);
+  }
+
   .text-gradient-brand {
-    background: linear-gradient(100deg, var(--color-brand-700), var(--color-brand-500) 55%, var(--color-brand-400));
+    background: linear-gradient(100deg, var(--color-brand-800), var(--color-brand-500) 50%, var(--color-violet-400));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
 
   .skeleton {
-    background: linear-gradient(90deg, var(--color-ink-100), var(--color-brand-50), var(--color-ink-100));
+    background: linear-gradient(90deg, var(--color-ink-100), var(--color-ink-200), var(--color-ink-100));
     background-size: 200% 100%;
     @apply animate-shimmer rounded-md;
   }
@@ -226,7 +251,7 @@
 
   .form-select {
     appearance: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5.5 7.5 10 12l4.5-4.5' stroke='%236b5e70' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5.5 7.5 10 12l4.5-4.5' stroke='%23a698b0' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");
     background-size: 1.1rem;
     background-position: right 0.8rem center;
     background-repeat: no-repeat;

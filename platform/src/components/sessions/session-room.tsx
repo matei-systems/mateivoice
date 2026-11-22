@@ -76,7 +76,7 @@ export function SessionRoom({
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-3xl bg-ink-950 text-white shadow-lift">
+      <div className="relative overflow-hidden rounded-3xl bg-stage text-white shadow-lift">
         <div className="aspect-video w-full">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgb(234_90_141/0.45),transparent_55%),radial-gradient(circle_at_80%_85%,rgb(176_36_92/0.45),transparent_50%)]" aria-hidden="true" />
           <div className="relative grid h-full place-items-center p-6 text-center">

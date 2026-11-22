@@ -16,6 +16,7 @@ import { invalidateAllUserSessions } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { AppError } from "@/server/errors";
 import { grantTestCoins } from "@/server/ledger/service";
+import { unsubscribe } from "@/server/email/service";
 import { markNotificationsRead, updateNotificationPreferences } from "@/server/notifications/service";
 import { formBool, formString, runAction } from "./helpers";
 
@@ -114,4 +115,11 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
   });
   if (done) redirect("/?konto=geloescht");
   return state;
+}
+
+export async function unsubscribeAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const ok = await unsubscribe(formString(formData, "token"));
+    if (!ok) throw new AppError("validation", "Der Abmeldelink ist ungültig.");
+  }, "Abgemeldet. Du erhältst diese Art von E-Mails nicht mehr.");
 }

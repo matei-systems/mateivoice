@@ -29,7 +29,21 @@ export const settingsSchemas = {
     minimumCoins: z.number().int().min(1).max(10_000_000),
     /** Haltefrist für Einnahmen (Schutz vor Rückbuchungen). */
     holdDays: z.number().int().min(0).max(120),
+    /**
+     * Auszahlungswert in Euro-Cent je 100 Münzen (vorläufig, Geschäftsentscheidung offen).
+     * Beispiel: 100 → 100 Münzen = 1,00 €.
+     */
+    centsPer100Coins: z.number().int().min(1).max(10_000),
+    /** Vier-Augen-Prinzip: Freigabe und Ausführung durch verschiedene Personen. */
+    requireFourEyes: z.boolean(),
   }),
+  payments: z
+    .object({
+      /** Verbraucherschutz/Betrugsprävention: maximale Käufe je Person (Cent, brutto). */
+      dailyLimitCents: z.number().int().min(100).max(1_000_000),
+      monthlyLimitCents: z.number().int().min(100).max(10_000_000),
+    })
+    .refine((v) => v.dailyLimitCents <= v.monthlyLimitCents, { message: "Tageslimit darf nicht über dem Monatslimit liegen." }),
   pricing: z
     .object({
       privateChatMin: z.number().int().min(1).max(10_000),
@@ -89,7 +103,8 @@ export const SETTING_KEYS = Object.keys(settingsSchemas) as SettingKey[];
 
 export const DEFAULT_SETTINGS: Settings = {
   commission: { platformBps: commission.defaultPlatformBps },
-  payout: { minimumCoins: 1000, holdDays: 14 },
+  payout: { minimumCoins: 1000, holdDays: 14, centsPer100Coins: 100, requireFourEyes: true },
+  payments: { dailyLimitCents: 25_000, monthlyLimitCents: 100_000 },
   pricing: {
     privateChatMin: pricing.privateChat.minCoinsPerMinute,
     privateChatMax: pricing.privateChat.maxCoinsPerMinute,
@@ -128,6 +143,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export const SETTING_LABELS: Record<SettingKey, string> = {
   commission: "Provision",
   payout: "Auszahlungsregeln",
+  payments: "Kauflimits",
   pricing: "Preisgrenzen",
   featureFlags: "Funktionen (Feature-Flags)",
   maintenance: "Wartungsmodus",

@@ -14,7 +14,7 @@ export function LiveViewer({ creatorProfileId, displayName }: { creatorProfileId
   const joined = state.status === "success";
   return (
     <div className="space-y-4">
-      <div className="relative aspect-video overflow-hidden rounded-3xl bg-ink-950 text-white shadow-lift">
+      <div className="relative aspect-video overflow-hidden rounded-3xl bg-stage text-white shadow-lift">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgb(234_90_141/0.5),transparent_55%),radial-gradient(circle_at_80%_80%,rgb(176_36_92/0.45),transparent_50%)]" aria-hidden="true" />
         <div className="relative grid h-full place-items-center p-6 text-center">
           <div className="max-w-md space-y-3">

@@ -12,7 +12,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
  */
 export function AgeGate() {
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-ink-950/45 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
+    <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-scrim/75 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
       <div className="w-full max-w-md animate-scale-in overflow-hidden rounded-3xl border border-line bg-surface shadow-lift">
         <div className="bg-aurora px-6 pt-8 pb-6 text-center sm:px-8">
           <LogoMark className="mx-auto size-12" />

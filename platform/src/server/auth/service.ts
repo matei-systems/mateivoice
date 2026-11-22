@@ -15,7 +15,9 @@ import { decryptField, encryptField, hashIdentifier, randomToken, sha256Hex } fr
 import { AppError, PG_UNIQUE_VIOLATION, pgConstraint, pgErrorCode, validationError } from "@/server/errors";
 import { writeAuditLog } from "@/server/audit";
 import { log } from "@/server/log";
-import { emailTemplates, sendEmail } from "@/server/notifications/email";
+import { queueEmail } from "@/server/email/service";
+import { getSettings } from "@/server/settings/service";
+import { deletionBlockers, logPrivacyRequest } from "@/server/compliance/privacy";
 import { RATE_LIMITS, consumeRateLimit, enforceRateLimit } from "@/server/rate-limit";
 import {
   burnPasswordCheck,
@@ -61,6 +63,7 @@ export const registrationSchema = z
     username: usernameSchema,
     password: passwordSchema,
     role: z.enum(["customer", "creator"], { error: "Bitte wähle eine Kontoart." }),
+    country: z.string({ error: "Bitte wähle dein Wohnsitzland." }).trim().toUpperCase().regex(/^[A-Z]{2}$/, "Bitte wähle dein Wohnsitzland."),
     confirmAdult: checkbox(`Die Plattform ist ausschließlich für Personen ab ${minimumAge} Jahren.`),
     acceptTerms: checkbox("Bitte bestätige die Nutzungsbedingungen."),
     acceptPrivacy: checkbox("Bitte bestätige, dass du die Datenschutzinformation gelesen hast."),
@@ -90,9 +93,10 @@ export type RegistrationInput = z.input<typeof registrationSchema>;
 const TOKEN_TTL_MS = {
   email_verification: 24 * 60 * 60 * 1000,
   password_reset: 60 * 60 * 1000,
+  staff_invite: 72 * 60 * 60 * 1000,
 } as const;
 
-async function issueToken(executor: Executor, userId: string, purpose: keyof typeof TOKEN_TTL_MS) {
+export async function issueToken(executor: Executor, userId: string, purpose: keyof typeof TOKEN_TTL_MS) {
   // Ältere, noch offene Token desselben Zwecks werden entwertet.
   await executor
     .update(authTokens)
@@ -109,7 +113,7 @@ async function issueToken(executor: Executor, userId: string, purpose: keyof typ
 }
 
 /** Löst einen Token atomar ein (nur einmal verwendbar). */
-async function consumeToken(executor: Executor, token: string, purpose: keyof typeof TOKEN_TTL_MS) {
+export async function consumeToken(executor: Executor, token: string, purpose: keyof typeof TOKEN_TTL_MS) {
   if (!token || token.length > 100) return null;
   const [row] = await executor
     .update(authTokens)
@@ -165,6 +169,15 @@ export async function registerUser(rawInput: unknown, ctx: RequestContext): Prom
   const parsed = registrationSchema.safeParse(rawInput);
   if (!parsed.success) throw validationError(parsed.error.issues[0]?.message ?? "Ungültige Eingabe.");
   const input = parsed.data;
+  const settings = await getSettings();
+  if (!settings.featureFlags.registrations) throw new AppError("feature_unavailable", "Registrierungen sind derzeit pausiert.");
+  if (input.role === "creator" && !settings.featureFlags.creatorApplications) {
+    throw new AppError("feature_unavailable", "Neue Creator-Bewerbungen sind derzeit pausiert.");
+  }
+  // Startmarkt DACH: nur zugelassene Wohnsitzländer (konfigurierbar).
+  if (!settings.ageAssurance.allowedCountries.includes(input.country)) {
+    throw validationError("Die Plattform ist in deinem Land derzeit nicht verfügbar.");
+  }
 
   const passwordHash = await hashPassword(input.password);
   const db = getDb();
@@ -173,7 +186,7 @@ export async function registerUser(rawInput: unknown, ctx: RequestContext): Prom
     return await db.transaction(async (tx) => {
       const [existingEmail] = await tx.select({ id: users.id }).from(users).where(eq(users.email, input.email)).limit(1);
       if (existingEmail) {
-        await sendEmail({ to: input.email, ...emailTemplates.registrationAttemptExisting() }, tx);
+        await queueEmail({ to: input.email, template: "registration_attempt_existing", data: {} }, tx);
         return { status: "accepted" as const, userId: null };
       }
       const [existingUsername] = await tx
@@ -191,6 +204,7 @@ export async function registerUser(rawInput: unknown, ctx: RequestContext): Prom
           username: input.username,
           passwordHash,
           role: input.role,
+          country: input.country,
           adultSelfDeclaredAt: now,
         })
         .returning({ id: users.id });
@@ -229,7 +243,7 @@ export async function registerUser(rawInput: unknown, ctx: RequestContext): Prom
       }
 
       const token = await issueToken(tx, user.id, "email_verification");
-      await sendEmail({ to: input.email, ...emailTemplates.emailVerification(token) }, tx);
+      await queueEmail({ to: input.email, template: "email_verification", data: { token } }, tx);
       return { status: "accepted" as const, userId: user.id };
     });
   } catch (error) {
@@ -326,10 +340,15 @@ export async function verifyEmail(token: string): Promise<"verified" | "invalid"
   return getDb().transaction(async (tx) => {
     const consumed = await consumeToken(tx, token, "email_verification");
     if (!consumed) return "invalid";
-    await tx
+    const updated = await tx
       .update(users)
       .set({ emailVerifiedAt: new Date() })
-      .where(and(eq(users.id, consumed.userId), isNull(users.emailVerifiedAt)));
+      .where(and(eq(users.id, consumed.userId), isNull(users.emailVerifiedAt)))
+      .returning({ username: users.username, role: users.role });
+    const user = updated[0];
+    if (user && (user.role === "customer" || user.role === "creator")) {
+      await queueEmail({ userId: consumed.userId, template: "welcome", data: { username: user.username, role: user.role } }, tx);
+    }
     return "verified";
   });
 }
@@ -340,7 +359,7 @@ export async function resendVerificationEmail(userId: string) {
     const [user] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!user || user.emailVerifiedAt || user.status === "deleted") return;
     const token = await issueToken(tx, user.id, "email_verification");
-    await sendEmail({ to: user.email, ...emailTemplates.emailVerification(token) }, tx);
+    await queueEmail({ to: user.email, template: "email_verification", data: { token } }, tx);
   });
 }
 
@@ -360,7 +379,7 @@ export async function requestPasswordReset(rawEmail: unknown, ctx: RequestContex
     const [user] = await tx.select().from(users).where(eq(users.email, email)).limit(1);
     if (!user || user.status === "deleted") return;
     const token = await issueToken(tx, user.id, "password_reset");
-    await sendEmail({ to: user.email, ...emailTemplates.passwordReset(token) }, tx);
+    await queueEmail({ to: user.email, template: "password_reset", data: { token } }, tx);
   });
 }
 
@@ -378,7 +397,7 @@ export async function resetPassword(input: { token: string; password: string }) 
       .returning({ email: users.email, status: users.status });
     if (!user || user.status === "deleted") throw new AppError("invalid_state", "Das Konto ist nicht mehr aktiv.");
     await invalidateAllUserSessions(tx, consumed.userId);
-    await sendEmail({ to: user.email, ...emailTemplates.passwordChanged() }, tx);
+    await queueEmail({ to: user.email, template: "password_changed", data: {} }, tx);
   });
 }
 
@@ -403,7 +422,7 @@ export async function changePassword(input: {
   await db.transaction(async (tx) => {
     await tx.update(users).set({ passwordHash }).where(eq(users.id, user.id));
     await invalidateAllUserSessions(tx, user.id, input.currentSessionId);
-    await sendEmail({ to: user.email, ...emailTemplates.passwordChanged() }, tx);
+    await queueEmail({ to: user.email, template: "password_changed", data: {} }, tx);
   });
 }
 
@@ -447,6 +466,7 @@ export async function confirmTotpEnrollment(
     if (isStaffRole(user.role)) {
       await writeAuditLog(tx, { actorUserId: user.id, action: "auth.mfa_enabled", targetType: "user", targetId: user.id, ipHash: ctx.ipHash });
     }
+    await queueEmail({ userId: user.id, template: "security_notice", data: { kind: "mfa_enabled" } }, tx);
   });
   await markSessionMfaVerified(input.sessionId);
 }
@@ -466,10 +486,10 @@ export async function disableTotp(input: { userId: string; password: string; cod
   }
   const step = verifyTotp(decryptField(user.totpSecretEncrypted), input.code, { lastUsedStep: user.totpLastUsedStep });
   if (step === null) throw new AppError("unauthenticated", "Der Code ist ungültig.");
-  await db
-    .update(users)
-    .set({ totpEnabledAt: null, totpSecretEncrypted: null, totpLastUsedStep: null })
-    .where(eq(users.id, user.id));
+  await db.transaction(async (tx) => {
+    await tx.update(users).set({ totpEnabledAt: null, totpSecretEncrypted: null, totpLastUsedStep: null }).where(eq(users.id, user.id));
+    await queueEmail({ userId: user.id, template: "security_notice", data: { kind: "mfa_disabled" } }, tx);
+  });
 }
 
 // ── Konto ───────────────────────────────────────────────────────────────────
@@ -522,8 +542,15 @@ export async function deleteAccount(input: { userId: string; password: string; c
   if (!(await verifyPassword(input.password, user.passwordHash))) {
     throw new AppError("unauthenticated", "Das Passwort ist nicht korrekt.");
   }
+  const blockers = await deletionBlockers(user.id);
+  if (blockers.length > 0) {
+    // Anfrage protokollieren (DSGVO: Bearbeitung nach Wegfall des Hinderungsgrunds).
+    await logPrivacyRequest(db, { userId: user.id, kind: "deletion", status: "on_hold", note: blockers.map((b) => b.code).join(", ") });
+    throw new AppError("invalid_state", blockers.map((b) => b.message).join(" "));
+  }
   const anonymousId = user.id.replace(/-/g, "").slice(0, 12);
   await db.transaction(async (tx) => {
+    await logPrivacyRequest(tx, { userId: user.id, kind: "deletion", status: "completed", note: "Selbstlöschung im Konto" });
     await tx
       .update(users)
       .set({

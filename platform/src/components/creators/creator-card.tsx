@@ -9,7 +9,7 @@ import { AvailabilityBadge, TestProfileBadge, VerificationBadge } from "@/compon
 import { cn } from "@/lib/utils";
 
 /** Hochwertige Creator-Karte mit Bild/Platzhalter, Status, Angeboten und Preis. */
-export function CreatorCard({ creator, priority, index = 0 }: { creator: CreatorCardData; priority?: boolean; index?: number }) {
+export function CreatorCard({ creator, priority, index = 0, tagLabels }: { creator: CreatorCardData; priority?: boolean; index?: number; tagLabels?: Record<string, string> }) {
   return (
     <article
       className="group relative flex animate-fade-up flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-1 hover:shadow-lift focus-within:shadow-lift"
@@ -32,7 +32,7 @@ export function CreatorCard({ creator, priority, index = 0 }: { creator: Creator
             className="size-full text-6xl transition-transform duration-500 ease-out group-hover:scale-[1.04]"
           />
         )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink-950/55 via-ink-950/0 to-ink-950/0" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-scrim/70 via-scrim/0 to-scrim/0" aria-hidden="true" />
         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
           <AvailabilityBadge availability={creator.availability} overlay />
         </div>
@@ -53,7 +53,7 @@ export function CreatorCard({ creator, priority, index = 0 }: { creator: Creator
           <ul className="flex flex-wrap gap-1.5" aria-label="Themen">
             {creator.tags.slice(0, 3).map((tag) => (
               <li key={tag} className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700">
-                {tagLabel(tag)}
+                {tagLabels?.[tag] ?? tagLabel(tag)}
               </li>
             ))}
           </ul>
@@ -77,7 +77,7 @@ export function CreatorCard({ creator, priority, index = 0 }: { creator: Creator
         className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         aria-label={`Profil von ${creator.displayName} ansehen`}
       >
-        <span className="absolute right-4 bottom-[4.6rem] grid size-9 translate-y-2 place-items-center rounded-full bg-white/95 text-brand-700 opacity-0 shadow-soft transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+        <span className="absolute right-4 bottom-[4.6rem] grid size-9 translate-y-2 place-items-center rounded-full bg-surface/90 text-brand-700 opacity-0 shadow-soft transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
           <ArrowUpRight className="size-4" aria-hidden="true" />
         </span>
       </Link>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BadgeCheck, CalendarClock, Coins, Eye, LayoutDashboard, Landmark, Radio, Tag, UserRoundPen } from "lucide-react";
+import { BadgeCheck, CalendarClock, Coins, Eye, FileSignature, LayoutDashboard, Landmark, Radio, Tag, UserRoundPen } from "lucide-react";
 import { requireRole } from "@/server/auth/current";
 import { getOwnProfile } from "@/server/creators/service";
 import { DashboardShell, type DashboardNavItem } from "@/components/layout/dashboard-shell";
@@ -19,6 +19,7 @@ const nav: DashboardNavItem[] = [
   { href: "/studio/earnings", label: "Einnahmen", icon: <Coins className={icon} /> },
   { href: "/studio/payouts", label: "Auszahlungen", icon: <Landmark className={icon} /> },
   { href: "/studio/verification", label: "Verifizierung", icon: <BadgeCheck className={icon} /> },
+  { href: "/studio/declarations", label: "Erklärungen", icon: <FileSignature className={icon} /> },
 ];
 
 export default async function StudioLayout({ children }: { children: ReactNode }) {

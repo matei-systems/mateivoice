@@ -2,6 +2,16 @@ import "server-only";
 import { and, eq, or } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import {
+  ageVerifications,
+  chatMessages,
+  creatorDeclarations,
+  creatorPayoutProfiles,
+  favorites,
+  moderationActions,
+  paymentOrders,
+  payouts,
+  privacyRequests,
+  userBlocks,
   authSessions,
   creatorOffers,
   creatorProfiles,
@@ -16,7 +26,7 @@ import {
   users,
   videoSessions,
 } from "@/server/db/schema";
-import { getStatement } from "@/server/ledger/service";
+import { activeCoinCurrency, getStatement } from "@/server/ledger/service";
 
 /**
  * Datenexport für Betroffene (Art. 15/20 DSGVO). Enthält nur Daten der
@@ -35,6 +45,7 @@ export async function exportUserData(userId: string) {
       emailVerifiedAt: users.emailVerifiedAt,
       adultSelfDeclaredAt: users.adultSelfDeclaredAt,
       twoFactorEnabled: users.totpEnabledAt,
+      country: users.country,
       createdAt: users.createdAt,
       lastLoginAt: users.lastLoginAt,
     })
@@ -77,6 +88,20 @@ export async function exportUserData(userId: string) {
         .where(and(eq(supportTickets.userId, userId), eq(supportMessages.isInternalNote, false)))
     : [];
 
+  const [ageChecks, declarations, favs, blocks, messages, orders, ownPayouts, payoutProfile, decisions, requests] = await Promise.all([
+    db.select({ provider: ageVerifications.provider, method: ageVerifications.method, status: ageVerifications.status, createdAt: ageVerifications.createdAt, verifiedAt: ageVerifications.verifiedAt }).from(ageVerifications).where(eq(ageVerifications.userId, userId)),
+    db.select({ declaration: creatorDeclarations.declaration, version: creatorDeclarations.version, acceptedAt: creatorDeclarations.acceptedAt }).from(creatorDeclarations).where(eq(creatorDeclarations.userId, userId)),
+    db.select({ creatorProfileId: favorites.creatorProfileId, createdAt: favorites.createdAt }).from(favorites).where(eq(favorites.userId, userId)),
+    db.select({ blockedUserId: userBlocks.blockedUserId, createdAt: userBlocks.createdAt }).from(userBlocks).where(eq(userBlocks.blockerUserId, userId)),
+    db.select({ sessionId: chatMessages.sessionId, kind: chatMessages.kind, body: chatMessages.body, tipAmount: chatMessages.tipAmount, createdAt: chatMessages.createdAt, deletedAt: chatMessages.deletedAt }).from(chatMessages).where(eq(chatMessages.senderUserId, userId)),
+    db.select({ id: paymentOrders.id, status: paymentOrders.status, coins: paymentOrders.coins, priceCents: paymentOrders.priceCents, currency: paymentOrders.currency, simulated: paymentOrders.simulated, provider: paymentOrders.provider, createdAt: paymentOrders.createdAt }).from(paymentOrders).where(eq(paymentOrders.userId, userId)),
+    db.select({ id: payouts.id, status: payouts.status, amount: payouts.amount, currency: payouts.currency, fiatAmountCents: payouts.fiatAmountCents, simulated: payouts.simulated, destinationMasked: payouts.destinationMasked, createdAt: payouts.createdAt }).from(payouts).where(eq(payouts.creatorUserId, userId)),
+    // Bankverbindung nur maskiert (Schutz bei Verlust der Exportdatei); vollständige Daten auf Anfrage beim Support.
+    db.select({ accountHolder: creatorPayoutProfiles.accountHolder, country: creatorPayoutProfiles.country, ibanLast4: creatorPayoutProfiles.ibanLast4, updatedAt: creatorPayoutProfiles.updatedAt }).from(creatorPayoutProfiles).where(eq(creatorPayoutProfiles.userId, userId)),
+    db.select({ action: moderationActions.action, statement: moderationActions.statement, ruleReference: moderationActions.ruleReference, createdAt: moderationActions.createdAt }).from(moderationActions).where(eq(moderationActions.affectedUserId, userId)),
+    db.select({ kind: privacyRequests.kind, status: privacyRequests.status, createdAt: privacyRequests.createdAt, completedAt: privacyRequests.completedAt }).from(privacyRequests).where(eq(privacyRequests.userId, userId)),
+  ]);
+
   return {
     exportedAt: new Date().toISOString(),
     notice: "Export deiner bei der Plattform gespeicherten Daten (Prototyp/Testmodus).",
@@ -87,11 +112,21 @@ export async function exportUserData(userId: string) {
     creatorProfile: profile[0] ?? null,
     verifications,
     videoSessions: sessionsAsParticipant,
-    walletStatement: user.role === "customer" ? await getStatement(userId, "customer_wallet", { limit: 10_000 }) : [],
-    earningsStatement: user.role === "creator" ? await getStatement(userId, "creator_earnings", { limit: 10_000 }) : [],
+    walletStatement: user.role === "customer" ? await getStatement(userId, "customer_wallet", { limit: 10_000, currency: activeCoinCurrency() }) : [],
+    earningsStatement: user.role === "creator" ? await getStatement(userId, "creator_earnings", { limit: 10_000, currency: activeCoinCurrency() }) : [],
     reportsSubmitted: ownReports,
     supportTickets: tickets.map((t) => ({ ...t, messages: ticketMessages.filter((m) => m.ticketId === t.id) })),
     sanctions: ownSanctions,
     notifications: inbox,
+    ageVerifications: ageChecks,
+    creatorDeclarations: declarations,
+    favorites: favs,
+    blockedUsers: blocks,
+    chatMessages: messages,
+    purchases: orders,
+    payouts: ownPayouts,
+    payoutProfile: payoutProfile[0] ?? null,
+    moderationDecisions: decisions,
+    privacyRequests: requests,
   };
 }

@@ -28,7 +28,7 @@ export function ReportDialog({
   signedIn,
   triggerLabel = "Melden",
 }: {
-  targetType: "creator_profile" | "user" | "video_session" | "media";
+  targetType: "creator_profile" | "user" | "video_session" | "media" | "chat_message";
   targetId: string;
   targetLabel: string;
   signedIn: boolean;

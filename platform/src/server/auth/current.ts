@@ -8,6 +8,7 @@ import { AppError } from "@/server/errors";
 import { safeRedirectPath } from "@/lib/utils";
 import { hasPermission, isStaffRole, type Actor, type Permission, type Role } from "./permissions";
 import { validateSessionToken, type ValidatedSession } from "./session";
+import { getSettings } from "@/server/settings/service";
 import type { RequestContext } from "./service";
 
 /**
@@ -89,6 +90,9 @@ export async function assertSession(): Promise<ValidatedSession> {
 export async function assertPermission(permission: Permission): Promise<{ session: ValidatedSession; actor: Actor }> {
   const session = await assertSession();
   const actor = toActor(session)!;
+  if (!isStaffRole(actor.role) && (await getSettings()).maintenance.enabled) {
+    throw new AppError("feature_unavailable", "Die Plattform wird gerade gewartet. Bitte versuche es später erneut.");
+  }
   if (permission.startsWith("admin.") && (!session.user.totpEnabled || !session.mfaVerified)) {
     throw new AppError("forbidden", "Für den Adminbereich ist eine bestätigte Zwei-Faktor-Anmeldung erforderlich.");
   }

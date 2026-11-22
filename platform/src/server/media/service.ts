@@ -4,7 +4,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import sharp, { type OutputInfo } from "sharp";
 import { uploads } from "@/config/platform";
 import { getDb } from "@/server/db/client";
-import { creatorProfiles, mediaAssets } from "@/server/db/schema";
+import { creatorProfiles, mediaAssets, moderationActions } from "@/server/db/schema";
 import { writeAuditLog } from "@/server/audit";
 import { hasPermission, type Actor } from "@/server/auth/permissions";
 import { AppError, forbidden, notFound, validationError } from "@/server/errors";
@@ -145,6 +145,15 @@ export async function moderateMedia(input: {
       ipHash: input.ipHash,
     });
     if (input.decision === "rejected") {
+      // Begründung (Statement of Reasons) bei Entfernung von Inhalten
+      await tx.insert(moderationActions).values({
+        action: "content_removed",
+        affectedUserId: asset.ownerUserId,
+        targetType: "media",
+        targetId: asset.id,
+        statement: input.note!.trim(),
+        createdById: input.adminUserId,
+      });
       await notify(tx, {
         userId: asset.ownerUserId,
         type: "media.rejected",

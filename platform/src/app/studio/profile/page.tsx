@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { Send, Trash2, Upload } from "lucide-react";
-import { LANGUAGES, TAGS } from "@/config/catalog";
+import { LANGUAGES } from "@/config/catalog";
+import { listCategories } from "@/server/settings/service";
 import { uploads } from "@/config/platform";
 import { deleteImageAction, submitForReviewAction, updateProfileAction, uploadImageAction } from "@/actions/studio";
 import { requireRole } from "@/server/auth/current";
@@ -25,7 +26,7 @@ const moderationBadge = {
 
 export default async function StudioProfilePage() {
   const session = await requireRole(["creator"], "/studio/profile");
-  const own = await getOwnProfile(session.user.id);
+  const [own, categories] = await Promise.all([getOwnProfile(session.user.id), listCategories()]);
   if (!own) return null;
   const { profile, media } = own;
   const review = reviewStatus[profile.reviewStatus]!;
@@ -77,9 +78,9 @@ export default async function StudioProfilePage() {
             <fieldset>
               <legend className="mb-2 text-sm font-medium text-ink-800">Themen (max. 6)</legend>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {TAGS.map((t) => (
-                  <Checkbox key={t.code} id={`tag-${t.code}`} name="tags" value={t.code} defaultChecked={profile.tags.includes(t.code)}>
-                    {t.label}
+                {categories.map((c) => (
+                  <Checkbox key={c.slug} id={`tag-${c.slug}`} name="tags" value={c.slug} defaultChecked={profile.tags.includes(c.slug)}>
+                    {c.label}
                   </Checkbox>
                 ))}
               </div>

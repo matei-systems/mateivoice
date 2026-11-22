@@ -24,6 +24,14 @@ export const RATE_LIMITS = {
   sessionRequestsPerUser: { limit: 20, windowSeconds: 60 * 60 },
   uploadsPerUser: { limit: 30, windowSeconds: 60 * 60 },
   sensitiveActionPerUser: { limit: 10, windowSeconds: 15 * 60 },
+  checkoutPerUser: { limit: 10, windowSeconds: 60 * 60 },
+  tipsPerUser: { limit: 60, windowSeconds: 10 * 60 },
+  chatMessagesPerUser: { limit: 30, windowSeconds: 60 },
+  payoutRequestsPerUser: { limit: 5, windowSeconds: 24 * 60 * 60 },
+  favoritesPerUser: { limit: 60, windowSeconds: 60 * 60 },
+  blocksPerUser: { limit: 30, windowSeconds: 60 * 60 },
+  ageVerificationPerUser: { limit: 5, windowSeconds: 60 * 60 },
+  contactPerIp: { limit: 5, windowSeconds: 60 * 60 },
 } satisfies Record<string, RateLimitRule>;
 
 export type RateLimitResult = { allowed: boolean; count: number; retryAfterSeconds: number };

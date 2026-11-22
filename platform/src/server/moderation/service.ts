@@ -4,13 +4,18 @@ import { z } from "zod";
 import { getDb, type Transaction } from "@/server/db/client";
 import {
   appeals,
+  chatMessages,
   creatorProfiles,
   mediaAssets,
+  moderationActions,
   reports,
   sanctions,
   users,
   videoSessions,
 } from "@/server/db/schema";
+import { placeLegalHold } from "@/server/compliance/holds";
+import { queueEmail } from "@/server/email/service";
+import { formatDateTime } from "@/lib/utils";
 import { writeAuditLog } from "@/server/audit";
 import { canViewSession, hasPermission, isStaffRole, type Actor } from "@/server/auth/permissions";
 import { invalidateAllUserSessions } from "@/server/auth/session";
@@ -49,7 +54,7 @@ export function priorityFor(category: ReportCategory): "critical" | "high" | "no
 }
 
 export const reportSchema = z.object({
-  targetType: z.enum(["creator_profile", "user", "video_session", "media"]),
+  targetType: z.enum(["creator_profile", "user", "video_session", "media", "chat_message"]),
   targetId: z.uuid("Ungültiges Meldungsziel."),
   category: z.enum(REPORT_CATEGORIES.map((c) => c.value) as [ReportCategory, ...ReportCategory[]], {
     error: "Bitte wähle einen Grund.",
@@ -76,6 +81,15 @@ async function assertReportTarget(actor: Actor, targetType: string, targetId: st
   } else if (targetType === "media") {
     const [row] = await db.select({ id: mediaAssets.id }).from(mediaAssets).where(eq(mediaAssets.id, targetId)).limit(1);
     if (!row) throw notFound("Inhalt nicht gefunden.");
+  } else if (targetType === "chat_message") {
+    const [row] = await db
+      .select({ session: videoSessions })
+      .from(chatMessages)
+      .innerJoin(videoSessions, eq(videoSessions.id, chatMessages.sessionId))
+      .where(eq(chatMessages.id, targetId))
+      .limit(1);
+    // Private Chats nur durch Beteiligte meldbar (kein Ausspähen über geratene IDs).
+    if (!row || (row.session.kind === "private_chat" && !canViewSession(actor, row.session))) throw notFound("Nachricht nicht gefunden.");
   }
 }
 
@@ -94,6 +108,20 @@ export async function createReport(actor: Actor, rawInput: unknown) {
       .insert(reports)
       .values({ reporterUserId: actor.id, ...input, priority })
       .returning({ id: reports.id });
+    if (priority === "critical") {
+      // Beweissicherung: gemeldetes Objekt und betroffenes Konto von Löschungen ausnehmen.
+      const reason = `Automatisch bei kritischer Meldung (${input.category}).`;
+      await placeLegalHold(tx, { staffUserId: null, targetType: "report", targetId: report!.id, reason, reportId: report!.id });
+      if (input.targetType === "media" || input.targetType === "video_session" || input.targetType === "chat_message" || input.targetType === "user") {
+        await placeLegalHold(tx, { staffUserId: null, targetType: input.targetType, targetId: input.targetId, reason, reportId: report!.id });
+      }
+      const targetUserId = await resolveReportTargetUser(input.targetType, input.targetId);
+      if (targetUserId) await placeLegalHold(tx, { staffUserId: null, targetType: "user", targetId: targetUserId, reason, reportId: report!.id });
+      if (input.targetType === "chat_message") {
+        const [message] = await tx.select({ sessionId: chatMessages.sessionId }).from(chatMessages).where(eq(chatMessages.id, input.targetId)).limit(1);
+        if (message) await placeLegalHold(tx, { staffUserId: null, targetType: "video_session", targetId: message.sessionId, reason, reportId: report!.id });
+      }
+    }
     if (priority !== "normal") {
       await notifyStaff(tx, "admin.reports.manage", {
         type: "report.priority",
@@ -167,6 +195,10 @@ export async function resolveReportTargetUser(targetType: string, targetId: stri
     const [row] = await db.select({ userId: videoSessions.creatorUserId }).from(videoSessions).where(eq(videoSessions.id, targetId)).limit(1);
     return row?.userId ?? null;
   }
+  if (targetType === "chat_message") {
+    const [row] = await db.select({ userId: chatMessages.senderUserId }).from(chatMessages).where(eq(chatMessages.id, targetId)).limit(1);
+    return row?.userId ?? null;
+  }
   return null;
 }
 
@@ -221,6 +253,8 @@ export const sanctionSchema = z.object({
   userId: z.uuid(),
   kind: z.enum(["warning", "suspension", "profile_hidden"]),
   reason: z.string().trim().min(10, "Bitte begründe die Maßnahme (mind. 10 Zeichen).").max(2000),
+  /** Verletzte Regel (z. B. „Community-Richtlinien 3.2“) – Teil der Begründung an die betroffene Person. */
+  ruleReference: z.string().trim().max(120).optional(),
   durationDays: z.coerce.number().int().min(0).max(3650).optional(),
   reportId: z.uuid().optional(),
 });
@@ -279,6 +313,20 @@ export async function createSanction(adminUserId: string, rawInput: unknown, ipH
         .set({ reviewStatus: "suspended", availability: "offline" })
         .where(eq(creatorProfiles.userId, target.id));
     }
+    // Begründung (Statement of Reasons) – unveränderlich gespeichert und der Person mitgeteilt.
+    await tx.insert(moderationActions).values({
+      action: input.kind === "warning" ? "warning" : input.kind === "suspension" ? "account_suspended" : "profile_hidden",
+      affectedUserId: target.id,
+      targetType: "user",
+      targetId: target.id,
+      statement: input.reason,
+      ruleReference: input.ruleReference || null,
+      reportId: input.reportId ?? null,
+      createdById: adminUserId,
+    });
+    if (input.kind === "suspension") {
+      await queueEmail({ userId: target.id, template: "account_suspended", data: { statement: input.reason, until: endsAt ? formatDateTime(endsAt) : null } }, tx);
+    }
     await writeAuditLog(tx, {
       actorUserId: adminUserId,
       action: `sanction.${input.kind}`,
@@ -292,7 +340,7 @@ export async function createSanction(adminUserId: string, rawInput: unknown, ipH
       userId: target.id,
       type: `sanction.${input.kind}`,
       title: input.kind === "warning" ? "Verwarnung" : input.kind === "suspension" ? "Konto gesperrt" : "Profil ausgeblendet",
-      body: `Begründung: ${input.reason} Du kannst Einspruch einlegen.`,
+      body: `Begründung: ${input.reason}${input.ruleReference ? ` (Regel: ${input.ruleReference})` : ""} Du kannst Einspruch einlegen.`,
       linkPath: "/account/support",
     });
     return sanction!;
@@ -339,6 +387,14 @@ async function liftSanctionInTx(
       .set({ reviewStatus: "pending_review" })
       .where(and(eq(creatorProfiles.userId, sanction.userId), eq(creatorProfiles.reviewStatus, "suspended")));
   }
+  await tx.insert(moderationActions).values({
+    action: "restriction_lifted",
+    affectedUserId: sanction.userId,
+    targetType: "sanction",
+    targetId: sanction.id,
+    statement: reason,
+    createdById: adminUserId,
+  });
   await notify(tx, {
     userId: sanction.userId,
     type: "sanction.lifted",
@@ -444,4 +500,55 @@ export async function decideAppeal(input: {
       linkPath: "/account/support",
     });
   });
+}
+
+
+// ── Streams beenden (Moderation) ────────────────────────────────────────────
+
+export async function terminateStream(input: { staffUserId: string; sessionId: string; statement: string; ruleReference?: string; ipHash?: string | null }) {
+  const statement = input.statement.trim();
+  if (statement.length < 10) throw validationError("Bitte begründe das Beenden (mind. 10 Zeichen).");
+  if (!z.uuid().safeParse(input.sessionId).success) throw notFound("Sitzung nicht gefunden.");
+  await getDb().transaction(async (tx) => {
+    const [session] = await tx.select().from(videoSessions).where(eq(videoSessions.id, input.sessionId)).limit(1);
+    if (!session) throw notFound("Sitzung nicht gefunden.");
+    if (!["requested", "accepted", "active"].includes(session.status)) throw invalidState("Die Sitzung ist bereits beendet.");
+    await endSessionByModeration(input.staffUserId, session.id, tx);
+    await tx.insert(moderationActions).values({
+      action: "stream_terminated",
+      affectedUserId: session.creatorUserId,
+      targetType: "video_session",
+      targetId: session.id,
+      statement,
+      ruleReference: input.ruleReference || null,
+      createdById: input.staffUserId,
+    });
+    await writeAuditLog(tx, { actorUserId: input.staffUserId, action: "stream.terminated", targetType: "video_session", targetId: session.id, reason: statement, ipHash: input.ipHash });
+    await notify(tx, {
+      userId: session.creatorUserId,
+      type: "moderation.stream_terminated",
+      title: "Sitzung durch die Moderation beendet",
+      body: `Begründung: ${statement}${input.ruleReference ? ` (Regel: ${input.ruleReference})` : ""}. Du kannst Einspruch über den Support einlegen.`,
+      linkPath: "/account/support",
+    });
+  });
+}
+
+/** Moderationsentscheidungen, die eine Person betreffen (Transparenz für Betroffene). */
+export async function listModerationActionsForUser(userId: string, limit = 50) {
+  return getDb()
+    .select()
+    .from(moderationActions)
+    .where(eq(moderationActions.affectedUserId, userId))
+    .orderBy(desc(moderationActions.createdAt))
+    .limit(limit);
+}
+
+export async function listRecentModerationActions(limit = 100) {
+  return getDb()
+    .select({ action: moderationActions, username: users.username })
+    .from(moderationActions)
+    .leftJoin(users, eq(users.id, moderationActions.affectedUserId))
+    .orderBy(desc(moderationActions.createdAt))
+    .limit(limit);
 }

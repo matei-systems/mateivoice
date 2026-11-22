@@ -9,7 +9,16 @@ const columns = [
       { href: "/creators", label: "Creator entdecken" },
       { href: "/creators?availability=live", label: "Jetzt live" },
       { href: "/how-it-works", label: "So funktioniert's" },
+      { href: "/pricing", label: "Preise & Münzen" },
       { href: "/for-creators", label: "Für Creator" },
+    ],
+  },
+  {
+    title: "Hilfe",
+    links: [
+      { href: "/help", label: "Hilfe-Center" },
+      { href: "/contact", label: "Kontakt" },
+      { href: "/support", label: "Support-Anfrage" },
     ],
   },
   {
@@ -33,8 +42,8 @@ const columns = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-24 border-t border-line bg-gradient-to-b from-surface to-brand-25 pb-24 md:pb-0">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
+    <footer className="mt-24 border-t border-line bg-gradient-to-b from-canvas to-surface pb-24 md:pb-0">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.4fr_repeat(4,1fr)]">
         <div className="space-y-4">
           <Logo />
           <p className="max-w-sm text-sm leading-relaxed text-ink-600">{brand.description}</p>
@@ -61,10 +70,10 @@ export function SiteFooter() {
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-6 text-xs text-ink-600 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p>
-            © {new Date().getFullYear()} {brand.name} · Arbeitsname · Prototyp ohne Echtbetrieb
+            © {new Date().getFullYear()} {brand.name} · Arbeitsname · Testbetrieb ohne Echtzahlungen
           </p>
           <p>
-            Rechtstexte sind Entwürfe und nicht rechtlich geprüft. <Link href="/support" className="font-medium text-brand-700 hover:underline">Hilfe & Kontakt</Link>
+            Rechtstexte sind Entwürfe und nicht rechtlich geprüft. <Link href="/contact" className="font-medium text-brand-700 hover:underline">Kontakt</Link>
           </p>
         </div>
       </div>

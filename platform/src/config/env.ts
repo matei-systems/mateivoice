@@ -32,9 +32,29 @@ const envSchema = z
     AUTH_SECRET: z.string().min(32, "muss mindestens 32 Zeichen lang sein"),
     DATA_ENCRYPTION_KEY: base64Key32,
     TEST_MODE: booleanString.default(true),
-    EMAIL_PROVIDER: z.enum(["dev-outbox", "disabled"]).default("dev-outbox"),
-    PAYMENT_PROVIDER: z.enum(["simulated", "none"]).default("simulated"),
-    PAYOUT_PROVIDER: z.enum(["none"]).default("none"),
+    EMAIL_PROVIDER: z.enum(["dev-outbox", "smtp", "disabled"]).default("dev-outbox"),
+    /** Absenderadresse – muss eine eigene, beim Mail-Dienst verifizierte Domain sein (nichts erfinden). */
+    EMAIL_FROM: z.email().optional(),
+    EMAIL_REPLY_TO: z.email().optional(),
+    SMTP_HOST: z.string().min(1).optional(),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+    SMTP_SECURE: booleanString.default(false),
+    SMTP_USER: z.string().min(1).optional(),
+    /** Geheim – nur über die Umgebung/Secret-Manager setzen. */
+    SMTP_PASSWORD: z.string().min(1).optional(),
+    /** Geheim – schützt den Job-Endpunkt /api/jobs/run (z. B. für einen Cron-Dienst). */
+    JOBS_SECRET: z.string().min(32).optional(),
+    /**
+     * simulated = Sandbox (signierte Webhooks, nur Testmünzen); verotel = Verotel FlexPay
+     * (Adapter vorhanden, Echtzahlungen bleiben gesperrt – siehe realCoinsEnabled()).
+     */
+    PAYMENT_PROVIDER: z.enum(["simulated", "verotel", "none"]).default("simulated"),
+    VEROTEL_SHOP_ID: z.string().regex(/^\d+$/, "muss numerisch sein").optional(),
+    /** Geheim – nur über die Umgebung/Secret-Manager setzen, niemals ins Repository. */
+    VEROTEL_SIGNATURE_KEY: z.string().min(8).optional(),
+    VEROTEL_START_URL: z.url().default("https://secure.verotel.com/startorder"),
+    /** sandbox = simulierte Auszahlungen (nur Testmünzen, kein Geld). */
+    PAYOUT_PROVIDER: z.enum(["sandbox", "none"]).default("sandbox"),
     VIDEO_PROVIDER: z.enum(["mock", "none"]).default("mock"),
     IDENTITY_PROVIDER: z.enum(["mock", "none"]).default("mock"),
     STORAGE_DRIVER: z.enum(["local"]).default("local"),
@@ -42,14 +62,22 @@ const envSchema = z
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   })
   .superRefine((env, ctx) => {
-    if (env.APP_ENV !== "production") return;
     const forbid = (path: string, message: string) =>
       ctx.addIssue({ code: "custom", path: [path], message });
+    if (env.EMAIL_PROVIDER === "smtp" && (!env.SMTP_HOST || !env.EMAIL_FROM)) {
+      forbid("EMAIL_PROVIDER", "smtp erfordert SMTP_HOST und EMAIL_FROM");
+    }
+    if (env.PAYMENT_PROVIDER === "verotel" && (!env.VEROTEL_SHOP_ID || !env.VEROTEL_SIGNATURE_KEY)) {
+      forbid("PAYMENT_PROVIDER", "verotel erfordert VEROTEL_SHOP_ID und VEROTEL_SIGNATURE_KEY");
+    }
+    if (env.APP_ENV !== "production") return;
     if (env.TEST_MODE) forbid("TEST_MODE", "darf in Produktion nicht aktiv sein");
     if (env.EMAIL_PROVIDER === "dev-outbox")
       forbid("EMAIL_PROVIDER", "dev-outbox ist in Produktion nicht erlaubt");
     if (env.PAYMENT_PROVIDER === "simulated")
       forbid("PAYMENT_PROVIDER", "simulierte Zahlungen sind in Produktion nicht erlaubt");
+    if (env.PAYOUT_PROVIDER === "sandbox")
+      forbid("PAYOUT_PROVIDER", "simulierte Auszahlungen sind in Produktion nicht erlaubt");
     if (env.VIDEO_PROVIDER === "mock")
       forbid("VIDEO_PROVIDER", "Mock-Video ist in Produktion nicht erlaubt");
     if (env.IDENTITY_PROVIDER === "mock")

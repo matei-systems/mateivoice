@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/server/auth/current";
 import { homePathFor } from "@/server/auth/permissions";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { RegisterForm } from "@/components/auth/register-form";
+import { Alert } from "@/components/ui/alert";
+import { getSettings } from "@/server/settings/service";
 
 export const metadata: Metadata = { title: "Registrieren", robots: { index: false } };
 
@@ -13,6 +15,7 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
   if (user) redirect(homePathFor(user.role));
   const params = await searchParams;
   const role = params.role === "creator" ? "creator" : "customer";
+  const settings = await getSettings();
   return (
     <AuthShell
       title="Konto erstellen"
@@ -26,7 +29,11 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
         </>
       }
     >
-      <RegisterForm initialRole={role} />
+      {!settings.featureFlags.registrations ? (
+        <Alert tone="warning" title="Registrierungen pausiert">Neue Konten können derzeit nicht erstellt werden. Bitte versuche es später erneut.</Alert>
+      ) : (
+        <RegisterForm initialRole={role} countries={settings.ageAssurance.allowedCountries} />
+      )}
     </AuthShell>
   );
 }

@@ -12,7 +12,7 @@ const tones: Record<BadgeTone, string> = {
   info: "bg-info-50 text-info-700 ring-info-200",
   test: "bg-test-50 text-test-700 ring-test-200",
   live: "bg-live text-white ring-live",
-  dark: "bg-ink-950/75 text-white ring-white/10 backdrop-blur",
+  dark: "bg-scrim/70 text-white ring-white/10 backdrop-blur",
 };
 
 export function Badge({

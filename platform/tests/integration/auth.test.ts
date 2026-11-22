@@ -27,6 +27,7 @@ function registration(overrides: Record<string, unknown> = {}) {
     username: `nutzer_${Math.random().toString(36).slice(2, 10)}`,
     password: "Ein-sehr-sicheres-Passwort-7",
     role: "customer",
+    country: "AT",
     confirmAdult: "on",
     acceptTerms: "on",
     acceptPrivacy: "on",

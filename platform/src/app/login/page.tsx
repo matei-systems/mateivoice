@@ -30,6 +30,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         </>
       }
     >
+      {params.invited === "1" ? (
+        <Alert tone="success" title="Passwort festgelegt" className="mb-5">
+          Melde dich jetzt an. Danach richtest du die Zwei-Faktor-Anmeldung ein – sie ist für Mitarbeiterkonten verpflichtend.
+        </Alert>
+      ) : null}
       {params.reset === "1" ? (
         <Alert tone="success" title="Passwort geändert" className="mb-5">
           Du kannst dich jetzt mit dem neuen Passwort anmelden. Alle anderen Sitzungen wurden beendet.

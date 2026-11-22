@@ -14,14 +14,14 @@ const base =
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-brand-600 text-white shadow-soft hover:bg-brand-700 hover:shadow-lift hover:-translate-y-px",
+    "bg-brand-600 text-white shadow-soft hover:bg-action-hover hover:shadow-lift hover:-translate-y-px",
   secondary: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200 hover:bg-brand-100",
-  outline: "bg-surface text-ink-800 ring-1 ring-inset ring-line-strong hover:bg-brand-25 hover:ring-brand-300",
+  outline: "bg-surface text-ink-800 ring-1 ring-inset ring-line-strong hover:bg-surface-2 hover:ring-brand-300",
   ghost: "text-ink-700 hover:bg-brand-50 hover:text-brand-700",
-  danger: "bg-danger-700 text-white shadow-soft hover:bg-danger-600",
+  danger: "bg-danger-solid text-white shadow-soft hover:bg-danger-solid-hover",
   subtle: "bg-ink-100 text-ink-800 hover:bg-ink-200",
   // Für dunkle Flächen
-  inverse: "bg-white text-brand-700 shadow-soft hover:bg-brand-50 hover:-translate-y-px",
+  inverse: "bg-white text-brand-deep shadow-soft hover:bg-brand-900 hover:-translate-y-px",
   ghostInverse: "text-white hover:bg-white/10",
 };
 

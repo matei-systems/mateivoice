@@ -23,6 +23,7 @@ export function ActionForm({
   resetOnSuccess,
   inlineSuccess,
   fullWidthSubmit,
+  disabledSubmit,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   children?: ReactNode;
@@ -34,6 +35,7 @@ export function ActionForm({
   resetOnSuccess?: boolean;
   inlineSuccess?: boolean;
   fullWidthSubmit?: boolean;
+  disabledSubmit?: boolean;
 }) {
   const [state, formAction] = useActionState(action, idleState);
   const formRef = useRef<HTMLFormElement>(null);
@@ -50,7 +52,7 @@ export function ActionForm({
       {children}
       <FormMessage state={state.status === "error" || inlineSuccess ? state : null} />
       {submitLabel ? (
-        <SubmitButton variant={submitVariant} size={submitSize} icon={submitIcon} className={fullWidthSubmit ? "w-full" : undefined}>
+        <SubmitButton variant={submitVariant} size={submitSize} icon={submitIcon} className={fullWidthSubmit ? "w-full" : undefined} disabled={disabledSubmit}>
           {submitLabel}
         </SubmitButton>
       ) : null}

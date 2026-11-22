@@ -40,9 +40,20 @@ const NEGATIVE_ALLOWED: ReadonlySet<AccountKind> = new Set([
 
 const OWNED_KINDS: ReadonlySet<AccountKind> = new Set(["customer_wallet", "creator_earnings"]);
 
-/** Echte Münzen sind erst nach rechtlicher Prüfung und Anbieterfreigabe zulässig. */
+/**
+ * Echte Münzen (COIN) sind erst zulässig, wenn ALLE Bedingungen erfüllt sind:
+ *  1. schriftliche Freigabe des Zahlungsanbieters für genau dieses Geschäftsmodell,
+ *  2. abgeschlossene rechtliche/steuerliche Prüfung (docs/LEGAL-DACH.md),
+ *  3. bestandener Integrationstest mit dem Anbieter,
+ *  4. bewusste, geprüfte Codeänderung (Vier-Augen-Prinzip) – kein Umgebungsschalter.
+ */
 export function realCoinsEnabled(): boolean {
   return false;
+}
+
+/** Währung für neue Vorgänge: im Testmodus Testmünzen, sonst echte Münzen (derzeit gesperrt). */
+export function activeCoinCurrency(): CoinCurrency {
+  return isTestMode() ? "TEST_COIN" : "COIN";
 }
 
 export async function getOrCreateAccount(
@@ -306,8 +317,14 @@ async function reverseTransaction(
       .where(eq(ledgerTransactions.id, input.originalTransactionId))
       .limit(1);
     if (!original) throw notFound("Buchung nicht gefunden.");
-    if (original.kind !== "session_charge" && original.kind !== "purchase") {
-      throw new AppError("invalid_state", "Nur Sitzungsabrechnungen und Käufe können umgekehrt werden.");
+    if (original.kind === "purchase") {
+      throw new AppError("invalid_state", "Käufe werden über den Zahlungsanbieter erstattet (Bereich „Bestellungen“). Die Gutschrift wird nach der Anbieter-Bestätigung automatisch umgebucht.");
+    }
+    if (original.kind !== "session_charge" && original.kind !== "tip") {
+      throw new AppError("invalid_state", "Nur Sitzungsabrechnungen und Trinkgelder können erstattet werden.");
+    }
+    if (kind === "chargeback") {
+      throw new AppError("invalid_state", "Rückbuchungen (Chargebacks) kommen ausschließlich vom Zahlungsanbieter.");
     }
     const [existingReversal] = await tx
       .select({ id: ledgerTransactions.id })
@@ -321,7 +338,7 @@ async function reverseTransaction(
       idempotencyKey: `${kind}:${original.id}`,
       kind,
       currency: original.currency,
-      description: kind === "refund" ? "Rückerstattung (simuliert)" : "Rückbuchung (simuliert)",
+      description: `Kulanzerstattung${original.simulated ? " (Testmünzen)" : ""}`,
       referenceType: original.referenceType ?? undefined,
       referenceId: original.referenceId ?? undefined,
       actorUserId: input.adminUserId,

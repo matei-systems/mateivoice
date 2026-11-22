@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Bell, CalendarClock, LayoutDashboard, LifeBuoy, Settings, Shield, Sparkles, Wallet } from "lucide-react";
+import { Bell, CalendarClock, Heart, LayoutDashboard, LifeBuoy, ReceiptText, Settings, Shield, ShieldCheck, Sparkles, UserX, Wallet } from "lucide-react";
 import { requireSession } from "@/server/auth/current";
 import { isStaffRole } from "@/server/auth/permissions";
 import { getActiveSanctions } from "@/server/moderation/service";
@@ -22,14 +22,18 @@ export default async function AccountLayout({ children }: { children: ReactNode 
     ...(user.role === "customer"
       ? [
           { href: "/account", label: "Übersicht", icon: <LayoutDashboard className={icon} />, exact: true },
-          { href: "/account/wallet", label: "Testguthaben", icon: <Wallet className={icon} /> },
+          { href: "/account/wallet", label: "Guthaben", icon: <Wallet className={icon} /> },
+          { href: "/account/purchases", label: "Kaufhistorie", icon: <ReceiptText className={icon} /> },
+          { href: "/account/favorites", label: "Favoriten", icon: <Heart className={icon} /> },
           { href: "/account/sessions", label: "Sitzungen", icon: <CalendarClock className={icon} /> },
+          { href: "/account/age-verification", label: "Altersprüfung", icon: <ShieldCheck className={icon} /> },
         ]
       : []),
     { href: "/account/notifications", label: "Benachrichtigungen", icon: <Bell className={icon} /> },
     { href: "/account/support", label: "Support & Meldungen", icon: <LifeBuoy className={icon} /> },
     { href: "/account/settings", label: "Einstellungen", icon: <Settings className={icon} /> },
     { href: "/account/security", label: "Sicherheit", icon: <Shield className={icon} /> },
+    ...(isStaffRole(user.role) ? [] : [{ href: "/account/privacy", label: "Privatsphäre & Daten", icon: <UserX className={icon} /> }]),
   ];
 
   return (
@@ -62,7 +66,7 @@ export default async function AccountLayout({ children }: { children: ReactNode 
       {!user.emailVerified ? (
         <Alert tone="warning" title="Bitte bestätige deine E-Mail-Adresse">
           <div className="space-y-2">
-            <p>Einige Funktionen (z. B. private Chats, Testguthaben, Meldungen) sind erst danach verfügbar.</p>
+            <p>Einige Funktionen (z. B. private Chats, Käufe, Chat, Meldungen) sind erst danach verfügbar.</p>
             <ActionForm action={resendVerificationAction} submitLabel="Bestätigungslink erneut senden" submitVariant="outline" submitSize="sm" inlineSuccess />
           </div>
         </Alert>

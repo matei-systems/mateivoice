@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { RotateCcw, Search } from "lucide-react";
-import { LANGUAGES, SORT_OPTIONS, TAGS } from "@/config/catalog";
+import { LANGUAGES, SORT_OPTIONS } from "@/config/catalog";
 import type { CreatorSearchParams } from "@/server/creators/service";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/form";
@@ -30,7 +30,7 @@ const availabilityTabs = [
  * Suche & Filter als echtes GET-Formular: funktioniert ohne JavaScript,
  * ist teilbar (URL) und serverseitig ausgewertet.
  */
-export function CreatorFilters({ params, total }: { params: CreatorSearchParams; total: number }) {
+export function CreatorFilters({ params, total, categories }: { params: CreatorSearchParams; total: number; categories: { slug: string; label: string }[] }) {
   const active = params.availability ?? "all";
   const hasFilters = !!(params.q || params.language || params.tag || params.maxPrice || (params.availability && params.availability !== "all") || (params.sort && params.sort !== "recommended"));
   return (
@@ -58,9 +58,9 @@ export function CreatorFilters({ params, total }: { params: CreatorSearchParams;
             <span className="sr-only">Thema</span>
             <Select name="tag" defaultValue={params.tag ?? ""}>
               <option value="">Alle Themen</option>
-              {TAGS.map((t) => (
-                <option key={t.code} value={t.code}>
-                  {t.label}
+              {categories.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.label}
                 </option>
               ))}
             </Select>
