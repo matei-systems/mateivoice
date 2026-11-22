@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "payouts_one_open_per_creator" ON "payouts" USING btree ("creator_user_id") WHERE "payouts"."status" IN ('requested', 'approved', 'processing');

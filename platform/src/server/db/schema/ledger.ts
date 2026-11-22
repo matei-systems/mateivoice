@@ -236,6 +236,10 @@ export const payouts = pgTable(
     index("payouts_creator_idx").on(t.creatorUserId, t.createdAt),
     index("payouts_status_idx").on(t.status, t.createdAt),
     uniqueIndex("payouts_idempotency_unique").on(t.idempotencyKey).where(sql`${t.idempotencyKey} IS NOT NULL`),
+    // Höchstens ein offener Antrag je Creator – Schutz vor parallelen Doppelanträgen.
+    uniqueIndex("payouts_one_open_per_creator")
+      .on(t.creatorUserId)
+      .where(sql`${t.status} IN ('requested', 'approved', 'processing')`),
     check("payouts_amount_positive", sql`${t.amount} > 0`),
     check(
       "payouts_currency_mode",

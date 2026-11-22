@@ -36,6 +36,13 @@
       "when": 1795352912710,
       "tag": "0004_stage2_email_payouts",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795376045441,
+      "tag": "0005_payouts_one_open",
+      "breakpoints": true
     }
   ]
 }

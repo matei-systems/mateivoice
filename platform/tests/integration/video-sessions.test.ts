@@ -194,13 +194,13 @@ describe("Private Sitzungen – Zugriffskontrolle", () => {
     await respondToRequest(actorOf(creator), session.id, "accept");
     const { token } = await joinPrivateSession(actorOf(customer), session.id);
     const provider = getVideoProvider()!;
-    const claims = provider.verifyJoinToken(token);
+    const claims = await provider.verifyJoinToken(token);
     expect(claims).toMatchObject({ sid: session.id, sub: customer.id, role: "customer" });
-    expect(provider.verifyJoinToken(token, new Date(Date.now() + 10 * 60_000))).toBeNull();
+    expect(await provider.verifyJoinToken(token, new Date(Date.now() + 10 * 60_000))).toBeNull();
     const [payload, signature] = token.split(".");
     const forged = Buffer.from(JSON.stringify({ ...claims, sub: "someone-else" })).toString("base64url");
-    expect(provider.verifyJoinToken(`${forged}.${signature}`)).toBeNull();
-    expect(provider.verifyJoinToken(`${payload}.invalid`)).toBeNull();
+    expect(await provider.verifyJoinToken(`${forged}.${signature}`)).toBeNull();
+    expect(await provider.verifyJoinToken(`${payload}.invalid`)).toBeNull();
   });
 });
 

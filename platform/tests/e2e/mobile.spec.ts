@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { acknowledgeAge, login } from "./helpers";
 
 test.describe("Mobile Darstellung", () => {
-  for (const path of ["/", "/creators", "/creators/aria", "/register", "/support"]) {
+  for (const path of ["/", "/creators", "/creators/aria", "/register", "/support", "/pricing", "/help", "/contact"]) {
     test(`kein horizontales Scrollen auf ${path}`, async ({ page, context }) => {
       await acknowledgeAge(context);
       await page.goto(path);
@@ -25,7 +25,7 @@ test.describe("Mobile Darstellung", () => {
   test("eingeloggte Bereiche ohne horizontales Scrollen", async ({ page, context }) => {
     await acknowledgeAge(context);
     await login(page, "kunde@aurora.test");
-    for (const path of ["/account", "/account/wallet", "/account/sessions", "/account/settings", "/account/security"]) {
+    for (const path of ["/account", "/account/wallet", "/account/purchases", "/account/favorites", "/account/age-verification", "/account/privacy", "/account/sessions", "/account/settings", "/account/security"]) {
       await page.goto(path);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(overflow, path).toBeLessThanOrEqual(0);

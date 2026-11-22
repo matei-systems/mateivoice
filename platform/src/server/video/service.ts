@@ -481,8 +481,8 @@ export async function joinPrivateSession(actor: Actor, sessionId: string) {
     } else {
       current = await settleBilling(tx, session, now);
     }
-    const token = provider.issueJoinToken({ sid: sessionId, sub: actor.id, role }, videoConfig.joinTokenTtlSeconds);
-    return { session: current, token: token.token, tokenExpiresAt: token.expiresAt, role };
+    const token = await provider.issueJoinToken({ sid: sessionId, sub: actor.id, role, roomId: current.providerRoomId }, videoConfig.joinTokenTtlSeconds);
+    return { session: current, token: token.token, tokenExpiresAt: token.expiresAt, serverUrl: token.serverUrl, role };
   });
 }
 
@@ -594,7 +594,7 @@ export async function setAvailability(actor: Actor, availability: "online" | "of
             currency: "TEST_COIN",
           })
           .returning();
-        const room = await provider.createRoom({ sessionId: created!.id, kind: "public_stream" });
+        const room = await provider.createRoom({ sessionId: created!.id, kind: "public_stream", maxParticipants: (await getSettings()).streaming.maxViewersPerStream });
         await tx.update(videoSessions).set({ providerRoomId: room.roomId }).where(eq(videoSessions.id, created!.id));
         await recordEvent(tx, created!.id, "stream_started", "server", actor.id, { simulated: !provider.isReal });
       }
@@ -644,8 +644,8 @@ export async function joinPublicStream(actor: Actor, creatorProfileId: string) {
         target: [videoSessionParticipants.sessionId, videoSessionParticipants.userId],
         set: { leftAt: null, lastHeartbeatAt: now },
       });
-    const token = provider.issueJoinToken({ sid: stream.id, sub: actor.id, role }, videoConfig.joinTokenTtlSeconds);
-    return { sessionId: stream.id, startedAt: stream.startedAt, token: token.token, tokenExpiresAt: token.expiresAt };
+    const token = await provider.issueJoinToken({ sid: stream.id, sub: actor.id, role, roomId: stream.providerRoomId }, videoConfig.joinTokenTtlSeconds);
+    return { sessionId: stream.id, startedAt: stream.startedAt, token: token.token, tokenExpiresAt: token.expiresAt, serverUrl: token.serverUrl, provider: provider.name };
   });
 }
 
@@ -818,4 +818,28 @@ export async function getOpenSessionForCustomer(customerUserId: string) {
     )
     .limit(1);
   return row ?? null;
+}
+
+
+// ── Anbieter-Ereignisse (Webhooks, z. B. LiveKit) ───────────────────────────
+
+/**
+ * Verarbeitet ein verifiziertes Anbieter-Ereignis idempotent (eindeutige Ereignis-ID).
+ * Raum beendet → laufende Sitzung wird serverseitig beendet (keine weiteren Minuten).
+ */
+export async function handleProviderRoomEvent(input: { sessionId: string; eventId: string; type: "participant_joined" | "participant_left" | "room_finished"; identity?: string | null }) {
+  await getDb().transaction(async (tx) => {
+    const session = await lockSession(tx, input.sessionId);
+    if (!session) return;
+    const inserted = await tx
+      .insert(videoSessionEvents)
+      .values({ sessionId: session.id, type: `provider_${input.type}`, source: "provider", actorUserId: null, payload: { identity: input.identity ?? null }, providerEventId: `${session.provider}:${input.eventId}` })
+      .onConflictDoNothing()
+      .returning({ id: videoSessionEvents.id });
+    if (inserted.length === 0) return; // Duplikat
+    if (input.type === "room_finished" && session.status === "active") {
+      const settled = await settleBilling(tx, session, new Date());
+      if (settled.status === "active") await finishSession(tx, settled, session.kind === "public_stream" ? "stream_ended" : "connection_lost", new Date());
+    }
+  });
 }

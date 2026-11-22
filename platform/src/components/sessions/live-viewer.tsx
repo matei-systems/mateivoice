@@ -7,11 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { FormMessage } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { idleState } from "@/lib/action-state";
+import { LiveKitStage } from "./livekit-stage";
 
-/** Öffentlicher Stream – im Mock-Modus nur Simulation des Beitritts ohne Video. */
-export function LiveViewer({ creatorProfileId, displayName }: { creatorProfileId: string; displayName: string }) {
+/** Öffentlicher Stream – mit echtem Anbieter (LiveKit) Video, im Mock-Modus nur Simulation des Beitritts. */
+export function LiveViewer({ creatorProfileId, displayName, publish = false }: { creatorProfileId: string; displayName: string; publish?: boolean }) {
   const [state, action] = useActionState(joinPublicStreamAction, idleState);
   const joined = state.status === "success";
+  const videoToken = typeof state.data?.videoToken === "string" ? state.data.videoToken : null;
+  const videoServerUrl = typeof state.data?.videoServerUrl === "string" ? state.data.videoServerUrl : null;
+  if (joined && videoToken && videoServerUrl) {
+    return <LiveKitStage serverUrl={videoServerUrl} token={videoToken} publish={publish} label={`Live-Stream von ${displayName}`} />;
+  }
   return (
     <div className="space-y-4">
       <div className="relative aspect-video overflow-hidden rounded-3xl bg-stage text-white shadow-lift">
@@ -21,7 +27,9 @@ export function LiveViewer({ creatorProfileId, displayName }: { creatorProfileId
             <VideoOff className="mx-auto size-10 text-white/70" aria-hidden="true" />
             <p className="font-display text-2xl font-semibold">{joined ? `Verbunden mit ${displayName}s Stream` : `${displayName} ist live`}</p>
             <p className="text-sm text-white/70">
-              Simulationsmodus: Es ist noch kein Videoanbieter angebunden. Der Beitritt wird serverseitig autorisiert und protokolliert, es wird aber kein Video übertragen.
+              {joined
+                ? "Simulationsmodus: Der Beitritt wurde serverseitig autorisiert und protokolliert, es wird aber kein Video übertragen."
+                : "Mit einem angebundenen Videoanbieter (LiveKit) startet hier das Video. Im Testmodus wird der Beitritt nur simuliert."}
             </p>
           </div>
         </div>
@@ -33,7 +41,7 @@ export function LiveViewer({ creatorProfileId, displayName }: { creatorProfileId
         <form action={action}>
           <input type="hidden" name="creatorProfileId" value={creatorProfileId} />
           <SubmitButton size="lg" icon={<Radio className="size-5" aria-hidden="true" />}>
-            Stream beitreten (Simulation)
+            {publish ? "Kamera starten" : "Stream beitreten"}
           </SubmitButton>
         </form>
       ) : null}

@@ -8,6 +8,7 @@ test.describe("Kunde", () => {
     await page.goto("/register");
     await page.getByLabel("E-Mail-Adresse").fill(email);
     await page.getByLabel("Nutzername").fill(`neu_${Date.now().toString().slice(-8)}`);
+    await page.getByLabel("Wohnsitzland").selectOption("AT");
     await page.getByLabel("Passwort").fill("Ein-sehr-sicheres-Passwort-7");
     await page.getByLabel(/mindestens 18 Jahre/).check();
     await page.getByLabel(/Nutzungsbedingungen/).check();
@@ -28,10 +29,11 @@ test.describe("Kunde", () => {
     await expect(page.getByText("500 Testmünzen gutgeschrieben")).toBeVisible();
     await page.goto("/account/wallet");
     await expect(page.getByText("Testguthaben erstellt").first()).toBeVisible();
-    await page.getByRole("button", { name: /Testmünzen anfordern/ }).click();
+    await page.getByRole("button", { name: /Testmünzen gratis/ }).click();
     await expect(formAlert(page)).toContainText("heute bereits Testguthaben erhalten");
-    // Münzpakete sind nur Beispiele und nicht kaufbar
-    await expect(page.getByRole("button", { name: /Noch nicht verfügbar/ }).first()).toBeDisabled();
+    // Käufe erst nach Altersprüfung möglich
+    await expect(page.getByText("Altersprüfung erforderlich").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Kaufen (Sandbox)" }).first()).toBeDisabled();
   });
 
   test("falsches Passwort zeigt neutrale Fehlermeldung", async ({ page }) => {

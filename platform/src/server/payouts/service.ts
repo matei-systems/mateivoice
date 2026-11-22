@@ -2,13 +2,13 @@ import "server-only";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getEnv, isTestMode } from "@/config/env";
-import { getDb, type Transaction } from "@/server/db/client";
+import { getDb, type Executor, type Transaction } from "@/server/db/client";
 import { creatorPayoutProfiles, ledgerAccounts, ledgerEntries, payouts, users } from "@/server/db/schema";
 import { writeAuditLog } from "@/server/audit";
 import { hasPermission, type Actor } from "@/server/auth/permissions";
 import { decryptField, encryptField, randomToken } from "@/server/crypto";
 import { queueEmail } from "@/server/email/service";
-import { AppError, featureUnavailable, forbidden, notFound, validationError } from "@/server/errors";
+import { AppError, PG_UNIQUE_VIOLATION, featureUnavailable, forbidden, notFound, pgErrorCode, validationError } from "@/server/errors";
 import { activeCoinCurrency, getOrCreateAccount, InsufficientFundsError, postTransaction, type CoinCurrency } from "@/server/ledger/service";
 import { notify, notifyStaff } from "@/server/notifications/service";
 import { enforceRateLimit, RATE_LIMITS } from "@/server/rate-limit";
@@ -114,10 +114,9 @@ async function decryptedIban(tx: Transaction, userId: string) {
 
 // ── Guthaben ────────────────────────────────────────────────────────────────
 
-export async function getPayoutSummary(userId: string) {
+export async function getPayoutSummary(userId: string, db: Executor = getDb()) {
   const settings = await getSettings();
   const currency = activeCoinCurrency();
-  const db = getDb();
   const [account] = await db
     .select({ id: ledgerAccounts.id, balance: ledgerAccounts.balance })
     .from(ledgerAccounts)
@@ -188,10 +187,15 @@ export async function requestPayout(actor: Actor, rawAmount: unknown, context: {
   const fiatAmountCents = coinsToCents(amount, settings.payout.centsPer100Coins);
   const payoutId = crypto.randomUUID();
 
-  const created = await getDb().transaction(async (tx) => {
+  const created = await getDb()
+    .transaction(async (tx) => {
     if (!(await creatorMayOperate(tx, actor.id))) throw new AppError("invalid_state", "Auszahlungen setzen eine abgeschlossene Alters- und Identitätsprüfung voraus.");
+    // Sperre auf das Konto serialisiert parallele Anträge; danach unter Sperre erneut prüfen.
     const [user] = await tx.select({ role: users.role, status: users.status }).from(users).where(eq(users.id, actor.id)).for("update");
     if (user?.role !== "creator" || user.status !== "active") throw forbidden();
+    const locked = await getPayoutSummary(actor.id, tx);
+    if (locked.openPayout) throw new AppError("conflict", "Es gibt bereits einen offenen Auszahlungsantrag.");
+    if (amount > locked.available) throw validationError(`Verfügbar sind derzeit ${locked.available} Münzen.`);
     const earnings = await getOrCreateAccount(tx, { kind: "creator_earnings", ownerUserId: actor.id, currency });
     const clearing = await getOrCreateAccount(tx, { kind: "system_payout_clearing", currency });
     let hold;
@@ -254,7 +258,12 @@ export async function requestPayout(actor: Actor, rawAmount: unknown, context: {
     });
     await queueEmail({ userId: actor.id, template: "payout_requested", data: { coins: amount, amount: formatEuroCents(fiatAmountCents), simulated } }, tx);
     return row!;
-  });
+    })
+    .catch((error: unknown) => {
+      // Datenbankregel „ein offener Antrag je Creator“ als letzte Absicherung
+      if (pgErrorCode(error) === PG_UNIQUE_VIOLATION) throw new AppError("conflict", "Es gibt bereits einen offenen Auszahlungsantrag.");
+      throw error;
+    });
   return created;
 }
 

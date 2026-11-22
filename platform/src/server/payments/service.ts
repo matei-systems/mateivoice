@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getEnv, isTestMode } from "@/config/env";
-import { getDb, type Transaction } from "@/server/db/client";
+import { getDb, type Executor, type Transaction } from "@/server/db/client";
 import { coinPackages, ledgerAccounts, ledgerEntries, ledgerTransactions, paymentEvents, paymentOrders, users } from "@/server/db/schema";
 import { writeAuditLog } from "@/server/audit";
 import { hasPermission, type Actor } from "@/server/auth/permissions";
@@ -117,8 +117,8 @@ export async function upsertCoinPackage(staffUserId: string, raw: unknown, ipHas
 // ── Checkout ────────────────────────────────────────────────────────────────
 
 /** Summe bestätigter bzw. offener Käufe seit `since` (für Kauflimits). */
-async function purchasedSince(userId: string, since: Date) {
-  const [row] = await getDb()
+async function purchasedSince(userId: string, since: Date, executor: Executor = getDb()) {
+  const [row] = await executor
     .select({ total: sql<number>`coalesce(sum(${paymentOrders.priceCents}), 0)::int` })
     .from(paymentOrders)
     .where(and(eq(paymentOrders.userId, userId), inArray(paymentOrders.status, ["confirmed", "pending"]), gte(paymentOrders.createdAt, since)));
@@ -156,6 +156,15 @@ export async function createCheckout(actor: Actor, packageId: string, context: {
   const provider = mode.provider;
   const appUrl = getEnv().APP_URL;
   const order = await getDb().transaction(async (tx) => {
+    // Parallele Checkouts derselben Person serialisieren und Limits unter Sperre erneut prüfen.
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, actor.id)).for("update");
+    const [lockedDaily, lockedMonthly] = await Promise.all([
+      purchasedSince(actor.id, new Date(now - 24 * 3600_000), tx),
+      purchasedSince(actor.id, new Date(now - 30 * 24 * 3600_000), tx),
+    ]);
+    if (lockedDaily + pkg.priceCents > settings.payments.dailyLimitCents || lockedMonthly + pkg.priceCents > settings.payments.monthlyLimitCents) {
+      throw new AppError("invalid_state", "Dein Kauflimit wäre überschritten.");
+    }
     const [created] = await tx
       .insert(paymentOrders)
       .values({

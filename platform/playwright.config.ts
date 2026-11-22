@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_PORT, e2eEnv } from "./tests/e2e/env";
 
@@ -5,6 +6,12 @@ import { E2E_PORT, e2eEnv } from "./tests/e2e/env";
  * End-to-End-Tests gegen den Produktions-Build (`pnpm build` vorab) mit eigener
  * Datenbank (aurora_e2e). Die Datenbank wird vor jedem Lauf neu aufgesetzt.
  */
+/**
+ * Optional vorinstalliertes Chromium verwenden (z. B. in Container-Umgebungen, deren
+ * Browser-Build nicht zur gepinnten @playwright/test-Version passt).
+ */
+const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH ?? (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : undefined);
+
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: false,
@@ -20,6 +27,7 @@ export default defineConfig({
     timezoneId: "Europe/Vienna",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    launchOptions: chromiumPath ? { executablePath: chromiumPath } : {},
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /mobile\.spec\.ts/ },

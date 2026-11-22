@@ -4,7 +4,7 @@ import { login, loginAdmin } from "./helpers";
 test.describe("Administration", () => {
   test("Admin-Login erfordert 2FA; Profilprüfung wird protokolliert", async ({ page }) => {
     await loginAdmin(page);
-    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Übersicht", level: 1 })).toBeVisible();
     await expect(page.getByText("Alle Salden stimmen")).toBeVisible();
 
     await page.goto("/admin/creators");

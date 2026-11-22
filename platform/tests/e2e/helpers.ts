@@ -1,7 +1,7 @@
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 import { Pool } from "pg";
 import { generateTotp } from "../../src/server/auth/totp";
-import { E2E_ADMIN_TOTP_SECRET, E2E_PASSWORD, e2eEnv } from "./env";
+import { E2E_ADMIN_TOTP_SECRET, E2E_FINANCE_TOTP_SECRET, E2E_MODERATOR_TOTP_SECRET, E2E_PASSWORD, E2E_SUPPORT_TOTP_SECRET, e2eEnv } from "./env";
 
 let pool: Pool | undefined;
 export function db() {
@@ -15,6 +15,9 @@ export async function acknowledgeAge(context: BrowserContext) {
 }
 
 export async function login(page: Page, email: string, password = E2E_PASSWORD, options: { expectSuccess?: boolean } = {}) {
+  // Alle Tests kommen von derselben IP (localhost): Login-Zähler zurücksetzen, damit das
+  // (separat getestete) Rate-Limit nicht zwischen unabhängigen Testfällen greift.
+  await db().query("DELETE FROM rate_limit_buckets WHERE key LIKE 'login:%' OR key LIKE 'mfa:%'");
   await page.goto("/login");
   await page.getByLabel("E-Mail-Adresse").fill(email);
   await page.getByLabel("Passwort", { exact: true }).fill(password);
@@ -30,13 +33,37 @@ export function formAlert(page: Page) {
   return page.locator('[role="alert"]:not(#__next-route-announcer__)');
 }
 
-export async function loginAdmin(page: Page) {
-  await login(page, "admin@aurora.test");
+// Der Server verhindert die Wiederverwendung eines TOTP-Codes (Replay-Schutz).
+// Wird dasselbe Konto im selben 30-s-Fenster erneut angemeldet, warten wir auf das nächste Fenster.
+const lastStep = new Map<string, number>();
+
+async function freshTotp(secret: string) {
+  let step = Math.floor(Date.now() / 30_000);
+  if (lastStep.get(secret) === step) {
+    await new Promise((resolve) => setTimeout(resolve, (step + 1) * 30_000 - Date.now() + 250));
+    step = Math.floor(Date.now() / 30_000);
+  }
+  lastStep.set(secret, step);
+  return generateTotp(secret);
+}
+
+const STAFF_SECRETS: Record<string, string> = {
+  "admin@aurora.test": E2E_ADMIN_TOTP_SECRET,
+  "moderation@aurora.test": E2E_MODERATOR_TOTP_SECRET,
+  "support@aurora.test": E2E_SUPPORT_TOTP_SECRET,
+  "finanzen@aurora.test": E2E_FINANCE_TOTP_SECRET,
+};
+
+export async function loginStaff(page: Page, email: keyof typeof STAFF_SECRETS | string) {
+  await login(page, email);
   await expect(page).toHaveURL(/\/login\/mfa/);
-  // Aktueller TOTP-Code aus dem (nur für E2E bekannten) Seed-Geheimnis.
-  await page.getByLabel("Code").fill(generateTotp(E2E_ADMIN_TOTP_SECRET));
+  await page.getByLabel("Code").fill(await freshTotp(STAFF_SECRETS[email]!));
   await page.getByRole("button", { name: "Bestätigen" }).click();
   await expect(page).toHaveURL(/\/admin/);
+}
+
+export async function loginAdmin(page: Page) {
+  await loginStaff(page, "admin@aurora.test");
 }
 
 export async function latestMailLink(to: string, template: string): Promise<string> {

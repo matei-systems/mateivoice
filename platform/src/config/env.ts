@@ -55,7 +55,12 @@ const envSchema = z
     VEROTEL_START_URL: z.url().default("https://secure.verotel.com/startorder"),
     /** sandbox = simulierte Auszahlungen (nur Testmünzen, kein Geld). */
     PAYOUT_PROVIDER: z.enum(["sandbox", "none"]).default("sandbox"),
-    VIDEO_PROVIDER: z.enum(["mock", "none"]).default("mock"),
+    /** livekit = LiveKit (selbst gehostet oder Cloud); Zugangsdaten nur über die Umgebung. */
+    VIDEO_PROVIDER: z.enum(["mock", "livekit", "none"]).default("mock"),
+    LIVEKIT_URL: z.string().regex(/^wss?:\/\//, "muss mit wss:// beginnen").optional(),
+    LIVEKIT_API_KEY: z.string().min(3).optional(),
+    /** Geheim – nur über die Umgebung/Secret-Manager setzen. */
+    LIVEKIT_API_SECRET: z.string().min(16).optional(),
     IDENTITY_PROVIDER: z.enum(["mock", "none"]).default("mock"),
     STORAGE_DRIVER: z.enum(["local"]).default("local"),
     STORAGE_LOCAL_DIR: z.string().default("./storage"),
@@ -66,6 +71,9 @@ const envSchema = z
       ctx.addIssue({ code: "custom", path: [path], message });
     if (env.EMAIL_PROVIDER === "smtp" && (!env.SMTP_HOST || !env.EMAIL_FROM)) {
       forbid("EMAIL_PROVIDER", "smtp erfordert SMTP_HOST und EMAIL_FROM");
+    }
+    if (env.VIDEO_PROVIDER === "livekit" && (!env.LIVEKIT_URL || !env.LIVEKIT_API_KEY || !env.LIVEKIT_API_SECRET)) {
+      forbid("VIDEO_PROVIDER", "livekit erfordert LIVEKIT_URL, LIVEKIT_API_KEY und LIVEKIT_API_SECRET");
     }
     if (env.PAYMENT_PROVIDER === "verotel" && (!env.VEROTEL_SHOP_ID || !env.VEROTEL_SIGNATURE_KEY)) {
       forbid("PAYMENT_PROVIDER", "verotel erfordert VEROTEL_SHOP_ID und VEROTEL_SIGNATURE_KEY");
@@ -83,6 +91,7 @@ const envSchema = z
     if (env.IDENTITY_PROVIDER === "mock")
       forbid("IDENTITY_PROVIDER", "Mock-Verifizierung ist in Produktion nicht erlaubt");
     if (!env.APP_URL.startsWith("https://")) forbid("APP_URL", "muss in Produktion https verwenden");
+    if (env.VIDEO_PROVIDER === "livekit" && !env.LIVEKIT_URL?.startsWith("wss://")) forbid("LIVEKIT_URL", "muss in Produktion wss:// verwenden");
   });
 
 export type Env = z.infer<typeof envSchema>;

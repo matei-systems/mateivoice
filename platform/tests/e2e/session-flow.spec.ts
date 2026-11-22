@@ -49,7 +49,7 @@ test("privater Chat: Anfrage, Annahme, Beitritt, Abrechnung und Ende", async ({ 
   // Creator sieht Einnahmen mit Provisionsaufschlüsselung
   await creator.goto("/studio/earnings");
   await expect(creator.getByText("Privater Chat").first()).toBeVisible();
-  await expect(creator.getByText("(30 %)").first()).toBeVisible();
+  await expect(creator.getByText("(25 %)").first()).toBeVisible();
 
   await customerContext.close();
   await creatorContext.close();

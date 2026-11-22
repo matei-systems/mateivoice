@@ -2,13 +2,14 @@ import Image from "next/image";
 import { cn, initials, stableHash } from "@/lib/utils";
 
 // Eigens erstellte Platzhalter-Verläufe (keine Fotos realer Personen).
+// Tiefe Pink-/Violett-Verläufe aus den Design-Tokens (passend zum dunklen Farbschema).
 const GRADIENTS = [
-  ["#ffd2e1", "#ea5a8d"],
-  ["#ffe8f0", "#f584aa"],
-  ["#fcb0c9", "#b0245c"],
-  ["#fde2b5", "#ea5a8d"],
-  ["#ddd6fe", "#cc2f6e"],
-  ["#ffe8f0", "#8c1f4b"],
+  ["var(--color-brand-300)", "var(--color-brand-600)"],
+  ["var(--color-violet-500)", "var(--color-brand-400)"],
+  ["var(--color-brand-200)", "var(--color-brand-500)"],
+  ["var(--color-brand-400)", "var(--color-brand-100)"],
+  ["var(--color-violet-400)", "var(--color-brand-300)"],
+  ["var(--color-brand-600)", "var(--color-brand-200)"],
 ] as const;
 
 const sizes = {
@@ -54,7 +55,7 @@ export function PlaceholderPortrait({ name, className }: { name: string; classNa
       className={cn("relative inline-grid place-items-center overflow-hidden font-display font-semibold text-white", className)}
       style={{ backgroundImage: `linear-gradient(${angle}deg, ${from}, ${to})` }}
     >
-      <svg className="absolute inset-0 size-full opacity-25" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <svg className="absolute inset-0 size-full opacity-[0.12]" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <circle cx="78" cy="20" r="28" fill="white" />
         <circle cx="12" cy="92" r="34" fill="white" />
       </svg>

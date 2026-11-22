@@ -4,11 +4,12 @@ import { useRouter } from "next/navigation";
 import { CircleStop, Flag, Loader2, LogIn, PhoneOff, VideoOff, Wifi, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { heartbeatAction, joinSessionAction, leaveSessionAction, sessionStateAction, type SessionClientState } from "@/actions/sessions";
+import { LiveKitStage } from "./livekit-stage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CoinIcon } from "@/components/ui/coins";
 import { endReasonLabel, sessionStatus } from "@/lib/labels";
-import { formatCoins, formatDuration } from "@/lib/utils";
+import { cn, formatCoins, formatDuration } from "@/lib/utils";
 
 /**
  * Sitzungsraum. Der Browser sendet nur Herzschläge; Abrechnung und Status
@@ -30,6 +31,8 @@ export function SessionRoom({
 }) {
   const router = useRouter();
   const [state, setState] = useState<SessionClientState>(initial);
+  // Video-Token nur aus dem Beitritt merken (Statusabfragen liefern es nicht erneut).
+  const [video, setVideo] = useState<{ token: string; serverUrl: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [now, setNow] = useState(() => Date.now());
@@ -76,7 +79,10 @@ export function SessionRoom({
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-3xl bg-stage text-white shadow-lift">
+      {video && !terminal ? (
+        <LiveKitStage serverUrl={video.serverUrl} token={video.token} publish={viewerRole === "creator"} label={`Privater Videochat mit ${counterpartName}`} />
+      ) : null}
+      <div className={cn("relative overflow-hidden rounded-3xl bg-stage text-white shadow-lift", video && !terminal && "hidden")}>
         <div className="aspect-video w-full">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgb(234_90_141/0.45),transparent_55%),radial-gradient(circle_at_80%_85%,rgb(176_36_92/0.45),transparent_50%)]" aria-hidden="true" />
           <div className="relative grid h-full place-items-center p-6 text-center">
@@ -142,7 +148,13 @@ export function SessionRoom({
               size="lg"
               disabled={pending}
               icon={pending ? <Loader2 className="size-5 animate-spin" aria-hidden="true" /> : <LogIn className="size-5" aria-hidden="true" />}
-              onClick={() => startTransition(async () => apply(await joinSessionAction(sessionId)))}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await joinSessionAction(sessionId);
+                  if (result.video) setVideo(result.video);
+                  apply(result);
+                })
+              }
             >
               Beitreten (Simulation)
             </Button>

@@ -13,6 +13,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PROTECTED_PREFIXES = ["/account", "/studio", "/admin", "/sessions"];
 
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
@@ -27,6 +35,10 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Externe Ziele nur, wenn der jeweilige Anbieter konfiguriert ist (Video-WebSocket, Zahlungsseite).
+  const videoOrigin = process.env.VIDEO_PROVIDER === "livekit" && process.env.LIVEKIT_URL ? originOf(process.env.LIVEKIT_URL) : null;
+  const paymentOrigin = process.env.PAYMENT_PROVIDER === "verotel" ? originOf(process.env.VEROTEL_START_URL ?? "https://secure.verotel.com/startorder") : null;
+
   const csp = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
@@ -34,11 +46,11 @@ export function proxy(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data:",
     "font-src 'self'",
-    `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
+    `connect-src 'self'${videoOrigin ? ` ${videoOrigin} ${videoOrigin.replace(/^wss:/, "https:").replace(/^ws:/, "http:")}` : ""}${isDev ? " ws: wss:" : ""}`,
     "media-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    `form-action 'self'${paymentOrigin ? ` ${paymentOrigin}` : ""}`,
     "frame-ancestors 'none'",
     ...(isHttps ? ["upgrade-insecure-requests"] : []),
   ].join("; ");

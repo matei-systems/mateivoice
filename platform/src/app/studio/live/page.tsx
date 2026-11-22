@@ -9,6 +9,8 @@ import { getLatestVerification } from "@/server/verification/service";
 import { getActiveStream, listOpenRequestsForCreator } from "@/server/video/service";
 import { AutoRefresh } from "@/components/studio/auto-refresh";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { LiveViewer } from "@/components/sessions/live-viewer";
+import { getVideoProvider } from "@/server/video/provider";
 import { ActionForm } from "@/components/ui/action-form";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -134,6 +136,14 @@ export default async function StudioLivePage() {
         Hinweis: Es ist noch kein Videoanbieter angebunden. „Live“ und private Chats laufen als Simulation ohne Bild und Ton.{" "}
         <Link href="/legal/community-guidelines" className="text-brand-700 hover:underline">Community-Richtlinien</Link>
       </p>
+      {stream && getVideoProvider()?.isReal ? (
+        <Card>
+          <CardHeader title="Deine Kamera" description="Nur du sendest Bild und Ton. Es wird nichts aufgezeichnet." />
+          <CardBody>
+            <LiveViewer creatorProfileId={own.profile.id} displayName={own.profile.displayName} publish />
+          </CardBody>
+        </Card>
+      ) : null}
       {stream ? (
         <ChatPanel sessionId={stream.id} viewerId={actor.id} title="Chat deines Streams (du moderierst)" className="max-h-[34rem]" />
       ) : null}

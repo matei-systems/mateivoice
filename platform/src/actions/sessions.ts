@@ -79,6 +79,8 @@ export type SessionClientState = {
   counterpartConnected?: boolean;
   joined?: boolean;
   tokenExpiresAt?: string;
+  /** Nur bei echtem Videoanbieter: kurzlebiges, raumgebundenes Beitritts-Token. */
+  video?: { token: string; serverUrl: string } | null;
 };
 
 async function snapshot(sessionId: string): Promise<SessionClientState> {
@@ -110,9 +112,13 @@ export async function joinSessionAction(sessionId: string): Promise<SessionClien
   return guard(async () => {
     const session = await assertSession();
     const result = await joinPrivateSession(toActor(session)!, requireId(sessionId));
-    // Das Beitritts-Token würde an das Video-SDK übergeben. Im Mock-Modus wird
-    // es nicht an den Browser ausgeliefert, da es keinen Videodienst gibt.
-    return { ...(await snapshot(sessionId)), tokenExpiresAt: result.tokenExpiresAt.toISOString() };
+    // Echter Anbieter: Token geht an das Video-SDK im Browser (nur dieser Raum, nur diese Person, kurzlebig).
+    // Mock-Modus: kein Token an den Browser, da es keinen Videodienst gibt.
+    return {
+      ...(await snapshot(sessionId)),
+      tokenExpiresAt: result.tokenExpiresAt.toISOString(),
+      video: result.serverUrl ? { token: result.token, serverUrl: result.serverUrl } : null,
+    };
   });
 }
 
@@ -140,10 +146,16 @@ export async function joinPublicStreamAction(_prev: ActionState, formData: FormD
   return runAction(async () => {
     const session = await assertSession();
     const result = await joinPublicStream(toActor(session)!, requireId(formString(formData, "creatorProfileId"), "Profil"));
+    const real = !!result.serverUrl;
     return {
       status: "success",
-      message: "Verbunden (Simulation). Es wird kein echtes Video übertragen.",
-      data: { sessionId: result.sessionId, tokenExpiresAt: result.tokenExpiresAt.toISOString() },
+      message: real ? "Verbunden." : "Verbunden (Simulation). Es wird kein echtes Video übertragen.",
+      data: {
+        sessionId: result.sessionId,
+        tokenExpiresAt: result.tokenExpiresAt.toISOString(),
+        videoToken: real ? result.token : null,
+        videoServerUrl: result.serverUrl,
+      },
     };
   });
 }
